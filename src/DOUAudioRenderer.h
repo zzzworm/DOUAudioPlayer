@@ -33,6 +33,7 @@
 @property (nonatomic, readonly, getter=isStarted) BOOL started;
 @property (nonatomic, assign, getter=isInterrupted) BOOL interrupted;
 @property (nonatomic, assign) double volume;
+@property (nonatomic, assign) double rate;
 
 @property (nonatomic, copy) NSArray *analyzers;
 

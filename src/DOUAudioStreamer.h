@@ -44,6 +44,9 @@ typedef NS_ENUM(NSInteger, DOUAudioStreamerErrorCode) {
 + (double)volume;
 + (void)setVolume:(double)volume;
 
++ (double)rate;
++ (void)setRate:(double)rate;
+
 + (NSArray *)analyzers;
 + (void)setAnalyzers:(NSArray *)analyzers;
 

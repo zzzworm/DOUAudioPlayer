@@ -23,6 +23,8 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <mach/mach_time.h>
+#import <AudioToolbox/AudioToolbox.h>
+#import <AVFoundation/AVFoundation.h>
 
 #if !TARGET_OS_IPHONE
 #include <CoreAudio/CoreAudio.h>
@@ -37,7 +39,7 @@
   pthread_mutex_t _mutex;
   pthread_cond_t _cond;
 
-  AudioComponentInstance _outputAudioUnit;
+  //AudioComponentInstance _outputAudioUnit;
 
   uint8_t *_buffer;
   NSUInteger _bufferByteCount;
@@ -52,7 +54,10 @@
   uint64_t _startedTime;
   uint64_t _interruptedTime;
   uint64_t _totalInterruptedInterval;
-
+  double _rate;
+    AudioUnit _mixerUnit;
+    AUGraph _processingGraph;
+    AVAudioUnitTimePitch *_timePitch;
 #if TARGET_OS_IPHONE
   double _volume;
 #endif /* TARGET_OS_IPHONE */
@@ -85,7 +90,11 @@
     [self _setupPropertyListenerForDefaultOutputDevice];
 #endif /* !TARGET_OS_IPHONE */
   }
-
+  if (@available(iOS 10.0, *)) {
+  }
+  else{
+      _rate = 1.0;
+  }
   return self;
 }
 
@@ -95,7 +104,7 @@
   [self _removePropertyListenerForDefaultOutputDevice];
 #endif /* !TARGET_OS_IPHONE */
 
-  if (_outputAudioUnit != NULL) {
+  if (_processingGraph != NULL) {
     [self tearDown];
   }
 
@@ -208,7 +217,7 @@ static OSStatus au_render_callback(void *inRefCon,
 
 - (BOOL)setUp
 {
-  if (_outputAudioUnit != NULL) {
+  if (_processingGraph != NULL) {
     return YES;
   }
 
@@ -227,6 +236,11 @@ static OSStatus au_render_callback(void *inRefCon,
   }
 #endif /* !TARGET_OS_IPHONE */
 
+    status = NewAUGraph(&_processingGraph);
+    if (status != noErr) {
+        return NO;
+    }
+    
   AudioComponentDescription desc;
   desc.componentType = kAudioUnitType_Output;
 #if TARGET_OS_IPHONE
@@ -238,51 +252,199 @@ static OSStatus au_render_callback(void *inRefCon,
   desc.componentFlags = 0;
   desc.componentFlagsMask = 0;
 
-  AudioComponent comp = AudioComponentFindNext(NULL, &desc);
-  if (comp == NULL) {
-    return NO;
-  }
-
-  status = AudioComponentInstanceNew(comp, &_outputAudioUnit);
-  if (status != noErr) {
-    _outputAudioUnit = NULL;
-    return NO;
-  }
+    //............................................................................
+    // Add nodes to the audio processing graph.
+    NSLog (@"Adding nodes to audio processing graph");
+    
+    AUNode   iONode;         // node for I/O unit
+#ifdef __IPHONE_10_0
+    AUNode   mixerNode;      // node for Multichannel Mixer unit
+#endif
+    // Add the nodes to the audio processing graph
+    status = AUGraphAddNode (
+                                _processingGraph,
+                                &desc,
+                                &iONode);
+    
+    if (noErr != status) {[self printErrorMessage: @"AUGraphNewNode failed for I/O unit" withStatus:status]; return NO;}
+    
+    if (@available(iOS 10.0, *)) {
+        // Multichannel mixer unit
+        AudioComponentDescription mixerUnitDescription;
+        mixerUnitDescription.componentType          = kAudioUnitType_Mixer;
+        mixerUnitDescription.componentSubType       = kAudioUnitSubType_SpatialMixer;
+        mixerUnitDescription.componentManufacturer  = kAudioUnitManufacturer_Apple;
+        mixerUnitDescription.componentFlags         = 0;
+        mixerUnitDescription.componentFlagsMask     = 0;
+        
+        status = AUGraphAddNode (
+                                 _processingGraph,
+                                 &mixerUnitDescription,
+                                 &mixerNode
+                                 );
+        
+        if (noErr != status) {[self printErrorMessage: @"AUGraphNewNode failed for Mixer unit" withStatus:status]; return NO;}
+    }
+    
+    //............................................................................
+    // Open the audio processing graph
+    
+    // Following this call, the audio units are instantiated but not initialized
+    //    (no resource allocation occurs and the audio units are not in a state to
+    //    process audio).
+    status = AUGraphOpen (_processingGraph);
+    
+    if (noErr != status) {[self printErrorMessage: @"AUGraphOpen" withStatus: status]; return NO;}
+    
+    //............................................................................
+    // Obtain the mixer unit instance from its corresponding node.
+    if (@available(iOS 10.0, *)) {
+    status =    AUGraphNodeInfo (
+                                 _processingGraph,
+                                 mixerNode,
+                                 NULL,
+                                 &_mixerUnit
+                                 );
+        //............................................................................
+        // Multichannel Mixer unit Setup
+        
+        UInt32 busCount   = 1;    // bus count for mixer unit input
+        //UInt32 audioBus  = 0;    // mixer unit bus 0 will be stereo and will take the guitar sound
+        
+        NSLog (@"Setting mixer unit input bus count to: %u", busCount);
+        status = AudioUnitSetProperty (
+                                       _mixerUnit,
+                                       kAudioUnitProperty_ElementCount,
+                                       kAudioUnitScope_Input,
+                                       0,
+                                       &busCount,
+                                       sizeof (busCount)
+                                       );
+        
+        if (noErr != status) {[self printErrorMessage: @"AudioUnitSetProperty (set mixer unit bus count)" withStatus: status]; return NO;}
+    }
+    else{
+        status =    AUGraphNodeInfo (
+                                     _processingGraph,
+                                     iONode,
+                                     NULL,
+                                     &_mixerUnit
+                                     );
+    }
+    if (noErr != status) {[self printErrorMessage: @"AUGraphNodeInfo" withStatus: status]; return NO;}
+    
+    
+    NSLog (@"Setting kAudioUnitProperty_MaximumFramesPerSlice for mixer unit global scope");
+    // Increase the maximum frames per slice allows the mixer unit to accommodate the
+    //    larger slice size used when the screen is locked.
+    UInt32 maximumFramesPerSlice = 4096;
+    
+    status = AudioUnitSetProperty (
+                                   _mixerUnit,
+                                   kAudioUnitProperty_MaximumFramesPerSlice,
+                                   kAudioUnitScope_Global,
+                                   0,
+                                   &maximumFramesPerSlice,
+                                   sizeof (maximumFramesPerSlice)
+                                   );
+    
+    if (noErr != status) {[self printErrorMessage: @"AudioUnitSetProperty (set mixer unit input stream format)" withStatus: status]; return NO;}
+    
+    
+//  AudioComponent comp = AudioComponentFindNext(NULL, &desc);
+//  if (comp == NULL) {
+//    return NO;
+//  }
+//
+//  status = AudioComponentInstanceNew(comp, &_outputAudioUnit);
+//  if (status != noErr) {
+//    _outputAudioUnit = NULL;
+//    return NO;
+//  }
 
   AudioStreamBasicDescription requestedDesc = [DOUAudioDecoder defaultOutputFormat];
-
-  status = AudioUnitSetProperty(_outputAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &requestedDesc, sizeof(requestedDesc));
+    if (@available(iOS 10.0, *)) {
+        
+    }
+    else{
+        requestedDesc.mSampleRate *= _rate;
+    }
+  status = AudioUnitSetProperty(_mixerUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &requestedDesc, sizeof(requestedDesc));
   if (status != noErr) {
-    AudioComponentInstanceDispose(_outputAudioUnit);
-    _outputAudioUnit = NULL;
+
+    _processingGraph = NULL;
     return NO;
   }
 
   UInt32 size = sizeof(requestedDesc);
-  status = AudioUnitGetProperty(_outputAudioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &requestedDesc, &size);
+  status = AudioUnitGetProperty(_mixerUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &requestedDesc, &size);
   if (status != noErr) {
-    AudioComponentInstanceDispose(_outputAudioUnit);
-    _outputAudioUnit = NULL;
+
+      _processingGraph = NULL;
     return NO;
   }
 
   AURenderCallbackStruct input;
   input.inputProc = au_render_callback;
   input.inputProcRefCon = (__bridge void *)self;
-
-  status = AudioUnitSetProperty(_outputAudioUnit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &input, sizeof(input));
+    if (@available(iOS 10.0, *)) {
+        status = AUGraphSetNodeInputCallback(_processingGraph,mixerNode, 0, &input);
+    }
+    else{
+        status = AUGraphSetNodeInputCallback(_processingGraph,iONode, 0, &input);
+    }
   if (status != noErr) {
-    AudioComponentInstanceDispose(_outputAudioUnit);
-    _outputAudioUnit = NULL;
+
+      _processingGraph = NULL;
     return NO;
   }
+    
+    NSLog (@"Setting sample rate for mixer unit output scope");
+    // Set the mixer unit's output sample rate format. This is the only aspect of the output stream
+    //    format that must be explicitly set.
+    
+    if (@available(iOS 10.0, *)) {
+    status = AudioUnitSetProperty (
+                                   _mixerUnit,
+                                   kAudioUnitProperty_SampleRate,
+                                   kAudioUnitScope_Output,
+                                   0,
+                                   &requestedDesc.mSampleRate,
+                                   sizeof (&requestedDesc.mSampleRate)
+                                   );
+    }
+    if (noErr != status) {[self printErrorMessage: @"AudioUnitSetProperty (set mixer unit output stream format)" withStatus: status]; return NO;}
 
-  status = AudioUnitInitialize(_outputAudioUnit);
-  if (status != noErr) {
-    AudioComponentInstanceDispose(_outputAudioUnit);
-    _outputAudioUnit = NULL;
-    return NO;
-  }
+
+    //............................................................................
+    // Connect the nodes of the audio processing graph
+    NSLog (@"Connecting the mixer output to the input of the I/O unit output element");
+    if (@available(iOS 10.0, *)) {
+    status = AUGraphConnectNodeInput (
+                                      _processingGraph,
+                                      mixerNode,         // source node
+                                      0,                 // source node output bus number
+                                      iONode,            // destination node
+                                      0                  // desintation node input bus number
+                                      );
+    
+    if (noErr != status) {[self printErrorMessage: @"AUGraphConnectNodeInput" withStatus: status]; return NO;}
+    }
+    //............................................................................
+    // Initialize audio processing graph
+    
+    // Diagnostic code
+    // Call CAShow if you want to look at the state of the audio processing
+    //    graph.
+    NSLog (@"Audio processing graph state immediately before initializing it:");
+    CAShow (_processingGraph);
+    
+    NSLog (@"Initializing the audio processing graph");
+    // Initialize the audio processing graph, configure audio data stream formats for
+    //    each input and output, and validate the connections between audio units.
+    status = AUGraphInitialize (_processingGraph);
+    
+    if (noErr != status) {[self printErrorMessage: @"AUGraphInitialize" withStatus: status]; return NO;}
 
   if (_buffer == NULL) {
     _bufferByteCount = (_bufferTime * requestedDesc.mSampleRate / 1000) * (requestedDesc.mChannelsPerFrame * requestedDesc.mBitsPerChannel / 8);
@@ -296,7 +458,7 @@ static OSStatus au_render_callback(void *inRefCon,
 
 - (void)tearDown
 {
-  if (_outputAudioUnit == NULL) {
+  if (_processingGraph == NULL) {
     return;
   }
 
@@ -306,9 +468,10 @@ static OSStatus au_render_callback(void *inRefCon,
 
 - (void)_tearDownWithoutStop
 {
-  AudioUnitUninitialize(_outputAudioUnit);
-  AudioComponentInstanceDispose(_outputAudioUnit);
-  _outputAudioUnit = NULL;
+    AUGraphStop(_processingGraph);
+    AUGraphClose(_processingGraph);
+  AUGraphUninitialize(_processingGraph);
+  _processingGraph = NULL;
 }
 
 #if !TARGET_OS_IPHONE
@@ -379,7 +542,7 @@ static OSStatus property_listener_default_output_device(AudioObjectID inObjectID
 
 - (void)renderBytes:(const void *)bytes length:(NSUInteger)length
 {
-  if (_outputAudioUnit == NULL) {
+  if (_processingGraph == NULL) {
     return;
   }
 
@@ -395,7 +558,7 @@ static OSStatus property_listener_default_output_device(AudioObjectID inObjectID
         }
 
         pthread_mutex_unlock(&_mutex);
-        AudioOutputUnitStart(_outputAudioUnit);
+        AUGraphStart(_processingGraph);
         pthread_mutex_lock(&_mutex);
         _started = YES;
       }
@@ -432,14 +595,14 @@ static OSStatus property_listener_default_output_device(AudioObjectID inObjectID
 {
   [_analyzers makeObjectsPerformSelector:@selector(flush)];
 
-  if (_outputAudioUnit == NULL) {
+  if (_processingGraph == NULL) {
     return;
   }
 
   pthread_mutex_lock(&_mutex);
   if (_started) {
     pthread_mutex_unlock(&_mutex);
-    AudioOutputUnitStop(_outputAudioUnit);
+    AUGraphStop(_processingGraph);
     pthread_mutex_lock(&_mutex);
 
     [self _setShouldInterceptTiming:YES];
@@ -458,7 +621,7 @@ static OSStatus property_listener_default_output_device(AudioObjectID inObjectID
 {
   [_analyzers makeObjectsPerformSelector:@selector(flush)];
 
-  if (_outputAudioUnit == NULL) {
+  if (_processingGraph == NULL) {
     return;
   }
 
@@ -549,6 +712,87 @@ static OSStatus property_listener_default_output_device(AudioObjectID inObjectID
   volume = fmin(fmax(volume, 0.0), 1.0);
   AudioUnitSetParameter(_outputAudioUnit, kHALOutputParam_Volume, kAudioUnitScope_Output, 1, volume, 0);
 #endif /* TARGET_OS_IPHONE */
+}
+
+- (double)rate
+{
+
+    if (_processingGraph == NULL) {
+        return 0.0;
+    }
+    if (@available(iOS 10.0, *)) {
+        AudioUnitParameterValue rate = 0.0;
+        AudioUnitGetParameter(_mixerUnit, k3DMixerParam_PlaybackRate, kAudioUnitScope_Input, 0, &rate);
+        return rate;
+    }
+    else{
+        return _rate;
+    }
+
+}
+
+- (void)setRate:(double)rate
+{
+    OSStatus result;
+    if (@available(iOS 10.0, *)) {
+        result =    AudioUnitSetParameter(
+                                               _mixerUnit,
+                                               k3DMixerParam_PlaybackRate,
+                                               kAudioUnitScope_Input,
+                                               0,
+                                               rate,
+                                               0);
+        if (_timePitch && rate == 1.0) {
+            
+        }
+        else if(NULL == _timePitch && rate != 1.0){
+            _timePitch = [[AVAudioUnitTimePitch alloc] init];
+            
+            AudioComponentDescription desc;
+            desc.componentType = kAudioUnitType_Effect;
+#if TARGET_OS_IPHONE
+            desc.componentSubType = kAudioUnitSubType_RemoteIO;
+#else /* TARGET_OS_IPHONE */
+            desc.componentSubType = kAudioUnitSubType_HALOutput;
+#endif /* TARGET_OS_IPHONE */
+            desc.componentManufacturer = kAudioUnitManufacturer_Apple;
+            desc.componentFlags = 0;
+            desc.componentFlagsMask = 0;
+            
+        }
+    }
+    else{
+        
+        AudioStreamBasicDescription requestedDesc = [DOUAudioDecoder defaultOutputFormat];
+        _rate = rate;
+        requestedDesc.mSampleRate *= _rate;
+        result = AudioUnitSetProperty (
+                                       _mixerUnit,
+                                       kAudioUnitProperty_SampleRate,
+                                       kAudioUnitScope_Output,
+                                       0,
+                                       &requestedDesc.mSampleRate,
+                                       sizeof (&requestedDesc.mSampleRate)
+                                       );
+    }
+    NSLog(@"channel: %d, p: %f", (unsigned int)0, rate);
+    
+    if (noErr != result) {[self printErrorMessage: @"AudioUnitSetParameter (set channel playbackrate)" withStatus: result]; return;}
+    
+}
+
+- (void)printErrorMessage: (NSString *) errorString withStatus: (OSStatus) result {
+    
+    char resultString[5];
+    UInt32 swappedResult = CFSwapInt32HostToBig (result);
+    bcopy (&swappedResult, resultString, 4);
+    resultString[4] = '\0';
+    
+    NSLog (
+           @"*** %@ error: %d %08X %4.4s\n",
+           errorString,
+           (char*) &resultString
+           );
 }
 
 @end

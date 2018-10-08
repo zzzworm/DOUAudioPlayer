@@ -602,6 +602,18 @@ static void *event_loop_main(void *info)
   }
 }
 
+- (double)rate
+{
+    return [_renderer rate];
+}
+
+
+- (void)setRate:(double)rate
+{
+    [_renderer setRate:rate];
+    
+}
+
 - (void)play
 {
   [self _sendEvent:event_play];

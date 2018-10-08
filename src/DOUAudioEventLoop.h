@@ -26,6 +26,7 @@
 
 @property (nonatomic, assign) NSTimeInterval currentTime;
 @property (nonatomic, assign) double volume;
+@property (nonatomic, assign) double rate;
 
 @property (nonatomic, copy) NSArray *analyzers;
 

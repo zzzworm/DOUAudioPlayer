@@ -38,6 +38,9 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
   UILabel *_volumeLabel;
   UISlider *_volumeSlider;
 
+    UILabel *_rateLabel;
+    UISlider *_rateSlider;
+    
   NSUInteger _currentTrackIndex;
   NSTimer *_timer;
 
@@ -103,8 +106,19 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
   _volumeSlider = [[UISlider alloc] initWithFrame:CGRectMake(CGRectGetMaxX([_volumeLabel frame]) + 10.0, CGRectGetMinY([_volumeLabel frame]), CGRectGetWidth([view bounds]) - CGRectGetMaxX([_volumeLabel frame]) - 10.0 - 20.0, 40.0)];
   [_volumeSlider addTarget:self action:@selector(_actionSliderVolume:) forControlEvents:UIControlEventValueChanged];
   [view addSubview:_volumeSlider];
+    
+    _rateLabel = [[UILabel alloc] initWithFrame:CGRectMake(20.0, CGRectGetMaxY([_volumeSlider frame]) + 20.0, 80.0, 40.0)];
+    [_rateLabel setText:@"Rate:"];
+    [view addSubview:_rateLabel];
+    
+    _rateSlider = [[UISlider alloc] initWithFrame:CGRectMake(CGRectGetMaxX([_rateLabel frame]) + 10.0, CGRectGetMinY([_rateLabel frame]), CGRectGetWidth([view bounds]) - CGRectGetMaxX([_rateLabel frame]) - 10.0 - 20.0, 40.0)];
+    _rateSlider.minimumValue = 0.5;
+    _rateSlider.maximumValue = 2.0;
+    _rateSlider.value = 1.0f;
+    [_rateSlider addTarget:self action:@selector(_actionSliderRate:) forControlEvents:UIControlEventValueChanged];
+    [view addSubview:_rateSlider];
 
-  _audioVisualizer = [[DOUAudioVisualizer alloc] initWithFrame:CGRectMake(0.0, CGRectGetMaxY([_volumeSlider frame]), CGRectGetWidth([view bounds]), CGRectGetHeight([view bounds]) - CGRectGetMaxY([_volumeSlider frame]))];
+  _audioVisualizer = [[DOUAudioVisualizer alloc] initWithFrame:CGRectMake(0.0, CGRectGetMaxY([_rateSlider frame]), CGRectGetWidth([view bounds]), CGRectGetHeight([view bounds]) - CGRectGetMaxY([_rateSlider frame]))];
   [_audioVisualizer setBackgroundColor:[UIColor colorWithRed:239.0 / 255.0 green:244.0 / 255.0 blue:240.0 / 255.0 alpha:1.0]];
   [view addSubview:_audioVisualizer];
 
@@ -287,6 +301,11 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
 - (void)_actionSliderVolume:(id)sender
 {
   [DOUAudioStreamer setVolume:[_volumeSlider value]];
+}
+
+- (void)_actionSliderRate:(id)sender
+{
+    [DOUAudioStreamer setRate:[_rateSlider value]];
 }
 
 @end

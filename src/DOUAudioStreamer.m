@@ -94,6 +94,16 @@ NSString *const kDOUAudioStreamerErrorDomain = @"com.douban.audio-streamer.error
   [[DOUAudioEventLoop sharedEventLoop] setVolume:volume];
 }
 
++ (double)rate
+{
+    return [[DOUAudioEventLoop sharedEventLoop] rate];
+}
+
++ (void)setRate:(double)rate
+{
+    [[DOUAudioEventLoop sharedEventLoop] setRate:rate];
+}
+
 + (NSArray *)analyzers
 {
   return [[DOUAudioEventLoop sharedEventLoop] analyzers];
