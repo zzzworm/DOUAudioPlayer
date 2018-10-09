@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5F7CF3B4216B59C200498518 /* AUiPodTimeProxy.m in Sources */ = {isa = PBXBuildFile; fileRef = 5F7CF3B2216B59C100498518 /* AUiPodTimeProxy.m */; };
+		5F7CF3B6216B65F200498518 /* sample.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5F7CF3B5216B65F200498518 /* sample.mp3 */; };
 		D400E947171BF13F00BE7F37 /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D400E946171BF13F00BE7F37 /* Accelerate.framework */; };
 		D40A255D17694680000B98AA /* DOUAudioAnalyzer+Default.m in Sources */ = {isa = PBXBuildFile; fileRef = D40A255C17694680000B98AA /* DOUAudioAnalyzer+Default.m */; };
 		D40A4D1717AB83C400D0305F /* DOUAudioStreamer+Options.m in Sources */ = {isa = PBXBuildFile; fileRef = D40A4D1617AB83C400D0305F /* DOUAudioStreamer+Options.m */; };
@@ -50,6 +52,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		5F7CF3B2216B59C100498518 /* AUiPodTimeProxy.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AUiPodTimeProxy.m; sourceTree = "<group>"; };
+		5F7CF3B3216B59C100498518 /* AUiPodTimeProxy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AUiPodTimeProxy.h; sourceTree = "<group>"; };
+		5F7CF3B5216B65F200498518 /* sample.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = sample.mp3; sourceTree = "<group>"; };
 		D400E946171BF13F00BE7F37 /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
 		D40A255B17694680000B98AA /* DOUAudioAnalyzer+Default.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "DOUAudioAnalyzer+Default.h"; sourceTree = "<group>"; };
 		D40A255C17694680000B98AA /* DOUAudioAnalyzer+Default.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "DOUAudioAnalyzer+Default.m"; sourceTree = "<group>"; };
@@ -148,6 +153,8 @@
 		D43ACD731738B47B00E6A571 /* DOUAudioStreamer */ = {
 			isa = PBXGroup;
 			children = (
+				5F7CF3B3216B59C100498518 /* AUiPodTimeProxy.h */,
+				5F7CF3B2216B59C100498518 /* AUiPodTimeProxy.m */,
 				D47CA39E17680AC5002D73B4 /* DOUAudioBase.h */,
 				D43ACD741738B47B00E6A571 /* DOUAudioDecoder.h */,
 				D43ACD751738B47B00E6A571 /* DOUAudioDecoder.m */,
@@ -251,6 +258,7 @@
 		D4C38929171B9D87009D6124 /* Supporting Files */ = {
 			isa = PBXGroup;
 			children = (
+				5F7CF3B5216B65F200498518 /* sample.mp3 */,
 				D4C3892A171B9D87009D6124 /* DOUASDemo-Info.plist */,
 				D4C3892B171B9D87009D6124 /* InfoPlist.strings */,
 				D4C3892E171B9D87009D6124 /* main.m */,
@@ -317,6 +325,7 @@
 				D4C38935171B9D87009D6124 /* Default.png in Resources */,
 				D4C38937171B9D87009D6124 /* Default@2x.png in Resources */,
 				D4C38939171B9D87009D6124 /* Default-568h@2x.png in Resources */,
+				5F7CF3B6216B65F200498518 /* sample.mp3 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -331,6 +340,7 @@
 				D4C3892F171B9D87009D6124 /* main.m in Sources */,
 				D40A4D1717AB83C400D0305F /* DOUAudioStreamer+Options.m in Sources */,
 				D47CA3A817680AF1002D73B4 /* DOUAudioSpatialAnalyzer.m in Sources */,
+				5F7CF3B4216B59C200498518 /* AUiPodTimeProxy.m in Sources */,
 				D47CA3A217680ADA002D73B4 /* DOUAudioAnalyzer.m in Sources */,
 				D4C38933171B9D87009D6124 /* AppDelegate.m in Sources */,
 				D43ACD8A1738B47B00E6A571 /* DOUAudioDecoder.m in Sources */,

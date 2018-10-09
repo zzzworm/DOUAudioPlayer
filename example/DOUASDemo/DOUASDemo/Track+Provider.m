@@ -55,19 +55,19 @@
 //    tracks = [allTracks copy];
 //  });
 NSMutableArray *allTracks = [NSMutableArray array];
-//    {
-//    Track *track = [[Track alloc] init];
-//  [track setArtist:@"test"];
-//  [track setTitle:@"sound"];
-//  [track setAudioFileURL:[NSURL URLWithString:@"http://traffic.libsyn.com/bigmoneystylist/BMS__FINAL_Ep036_1.m4a?dest-id=632848"]];
-//    [allTracks addObject:track];
-//    }
+    {
+    Track *track = [[Track alloc] init];
+  [track setArtist:@"test"];
+  [track setTitle:@"sound"];
+  [track setAudioFileURL:[[NSBundle mainBundle] URLForResource:@"sample" withExtension:@"mp3"] ];
+    [allTracks addObject:track];
+    }
     
     {
         Track *track = [[Track alloc] init];
     [track setArtist:@"china audio"];
     [track setTitle:@"ximalaya audio 1"];
-    [track setAudioFileURL:[NSURL URLWithString:@"http://cdn.lizhi.fm/audio/2015/07/29/21788873806329222_hd.mp3"]];
+    [track setAudioFileURL:[NSURL URLWithString:@"https://dts.podtrac.com/redirect.mp3/dovetail.prxu.org/serial/75ea7f5c-e80f-46c5-9d5e-759b398d1d32/serial-s01-e02.mp3"]];
     [allTracks addObject:track];
     }
   return allTracks;

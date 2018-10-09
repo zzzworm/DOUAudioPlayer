@@ -39,6 +39,7 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
   UISlider *_volumeSlider;
 
     UILabel *_rateLabel;
+    UILabel *_rateValLabel;
     UISlider *_rateSlider;
     
   NSUInteger _currentTrackIndex;
@@ -107,9 +108,13 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
   [_volumeSlider addTarget:self action:@selector(_actionSliderVolume:) forControlEvents:UIControlEventValueChanged];
   [view addSubview:_volumeSlider];
     
-    _rateLabel = [[UILabel alloc] initWithFrame:CGRectMake(20.0, CGRectGetMaxY([_volumeSlider frame]) + 20.0, 80.0, 40.0)];
+    _rateLabel = [[UILabel alloc] initWithFrame:CGRectMake(20.0, CGRectGetMaxY([_volumeSlider frame]) + 10.0, 80.0, 40.0)];
     [_rateLabel setText:@"Rate:"];
     [view addSubview:_rateLabel];
+    
+    _rateValLabel = [[UILabel alloc] initWithFrame:CGRectMake(160.0, CGRectGetMaxY([_volumeSlider frame]) - 10 , 80.0, 40.0)];
+    [_rateValLabel setText:@"1.0"];
+    [view addSubview:_rateValLabel];
     
     _rateSlider = [[UISlider alloc] initWithFrame:CGRectMake(CGRectGetMaxX([_rateLabel frame]) + 10.0, CGRectGetMinY([_rateLabel frame]), CGRectGetWidth([view bounds]) - CGRectGetMaxX([_rateLabel frame]) - 10.0 - 20.0, 40.0)];
     _rateSlider.minimumValue = 0.5;
@@ -306,6 +311,7 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
 - (void)_actionSliderRate:(id)sender
 {
     [DOUAudioStreamer setRate:[_rateSlider value]];
+    _rateValLabel.text = [NSString stringWithFormat:@"%.2f",[_rateSlider value]];
 }
 
 @end
