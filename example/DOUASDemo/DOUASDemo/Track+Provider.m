@@ -62,13 +62,22 @@ NSMutableArray *allTracks = [NSMutableArray array];
   [track setAudioFileURL:[[NSBundle mainBundle] URLForResource:@"sample" withExtension:@"mp3"] ];
     [allTracks addObject:track];
     }
-    
+
     {
         Track *track = [[Track alloc] init];
     [track setArtist:@"china audio"];
     [track setTitle:@"ximalaya audio 1"];
-    [track setAudioFileURL:[NSURL URLWithString:@"https://dts.podtrac.com/redirect.mp3/dovetail.prxu.org/serial/75ea7f5c-e80f-46c5-9d5e-759b398d1d32/serial-s01-e02.mp3"]];
+    [track setAudioFileURL:[NSURL URLWithString:@"http://cdn.lizhi.fm/audio/2015/07/29/21788873806329222_hd.mp3"]];
     [allTracks addObject:track];
+    }
+    
+    {
+        Track *track = [[Track alloc] init];
+        [track setArtist:@"host audio"];
+        [track setTitle:@"ximalaya audio 2"];
+        [track setAudioFileURL:[NSURL URLWithString:@"http://audio.xmcdn.com/group40/M01/6F/7F/wKgJVFreBVvxgalhAArdXwr0RBs920.m4a"]];
+        [allTracks addObject:track];
+        
     }
   return allTracks;
 }

@@ -36,21 +36,30 @@ typedef NS_ENUM(NSInteger, DOUAudioStreamerErrorCode) {
   DOUAudioStreamerDecodingError
 };
 
+typedef NS_OPTIONS(NSUInteger, DOUAudioStreamerOptions) {
+    DOUAudioStreamerKeepPersistentVolume = 1 << 0,
+    DOUAudioStreamerRemoveCacheOnDeallocation = 1 << 1,
+    DOUAudioStreamerRequireSHA256 = 1 << 2,
+    
+    DOUAudioStreamerDefaultOptions = DOUAudioStreamerKeepPersistentVolume |
+    DOUAudioStreamerRemoveCacheOnDeallocation
+};
+
+@interface DOUAudioStreamerConfig : NSObject
+
+@property (nonatomic, strong) NSString* offlinePath;
+@property (nonatomic, strong) NSString* downloadedPath;
+@property (nonatomic, strong) NSString* metaDataPath;
+
+@property (nonatomic, assign) DOUAudioStreamerOptions options;
+@end
+
 @interface DOUAudioStreamer : NSObject
 
 + (instancetype)streamerWithAudioFile:(id <DOUAudioFile>)audioFile;
 - (instancetype)initWithAudioFile:(id <DOUAudioFile>)audioFile;
 
-+ (double)volume;
-+ (void)setVolume:(double)volume;
-
-+ (double)rate;
-+ (void)setRate:(double)rate;
-
-+ (NSArray *)analyzers;
-+ (void)setAnalyzers:(NSArray *)analyzers;
-
-+ (void)setHintWithAudioFile:(id <DOUAudioFile>)audioFile;
+- (void)setHintWithAudioFile:(id <DOUAudioFile>)audioFile;
 
 @property (assign, readonly) DOUAudioStreamerStatus status;
 @property (strong, readonly) NSError *error;
@@ -59,10 +68,6 @@ typedef NS_ENUM(NSInteger, DOUAudioStreamerErrorCode) {
 @property (nonatomic, readonly) NSURL *url;
 
 @property (nonatomic, assign, readonly) NSTimeInterval duration;
-@property (nonatomic, assign) NSTimeInterval currentTime;
-@property (nonatomic, assign) double volume;
-
-@property (nonatomic, copy) NSArray *analyzers;
 
 @property (nonatomic, readonly) NSString *cachedPath;
 @property (nonatomic, readonly) NSURL *cachedURL;
@@ -74,8 +79,5 @@ typedef NS_ENUM(NSInteger, DOUAudioStreamerErrorCode) {
 @property (nonatomic, readonly) NSUInteger downloadSpeed;
 @property (nonatomic, assign, readonly) double bufferingRatio;
 
-- (void)play;
-- (void)pause;
-- (void)stop;
 
 @end

@@ -27,6 +27,7 @@
   NSUInteger _bitRate;
   NSUInteger _dataOffset;
   NSUInteger _estimatedDuration;
+  NSUInteger _audioDataByteCount;
 }
 @end
 
@@ -39,6 +40,7 @@
 @synthesize bitRate = _bitRate;
 @synthesize dataOffset = _dataOffset;
 @synthesize estimatedDuration = _estimatedDuration;
+@synthesize audioDataByteCount = _audioDataByteCount;
 
 - (id <DOUAudioFile>)audioFile
 {
@@ -315,6 +317,13 @@ static SInt64 audio_file_get_size(void *inClientData)
   }
   _estimatedDuration = estimatedDuration * 1000.0;
 
+    SInt64 audioDataByteCount = 0;
+    size = sizeof(audioDataByteCount);
+    status = AudioFileGetProperty(_fileID, kAudioFilePropertyAudioDataByteCount, &size, &audioDataByteCount);
+    if (status != noErr) {
+        return NO;
+    }
+    _audioDataByteCount = (NSUInteger)audioDataByteCount;
   return YES;
 }
 

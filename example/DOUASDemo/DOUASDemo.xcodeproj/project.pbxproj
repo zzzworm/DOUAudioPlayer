@@ -9,6 +9,9 @@
 /* Begin PBXBuildFile section */
 		5F7CF3B4216B59C200498518 /* AUiPodTimeProxy.m in Sources */ = {isa = PBXBuildFile; fileRef = 5F7CF3B2216B59C100498518 /* AUiPodTimeProxy.m */; };
 		5F7CF3B6216B65F200498518 /* sample.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5F7CF3B5216B65F200498518 /* sample.mp3 */; };
+		5FECCF7A216F95A80019FAFB /* DOUCacheInfo.m in Sources */ = {isa = PBXBuildFile; fileRef = 5FECCF79216F95A80019FAFB /* DOUCacheInfo.m */; };
+		5FECCF7D216F9E710019FAFB /* DOUAudioRemoteFileProvider.m in Sources */ = {isa = PBXBuildFile; fileRef = 5FECCF7C216F9E710019FAFB /* DOUAudioRemoteFileProvider.m */; };
+		5FECCF8121707A880019FAFB /* DOUAudioPlayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 5FECCF8021707A880019FAFB /* DOUAudioPlayer.m */; };
 		D400E947171BF13F00BE7F37 /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D400E946171BF13F00BE7F37 /* Accelerate.framework */; };
 		D40A255D17694680000B98AA /* DOUAudioAnalyzer+Default.m in Sources */ = {isa = PBXBuildFile; fileRef = D40A255C17694680000B98AA /* DOUAudioAnalyzer+Default.m */; };
 		D40A4D1717AB83C400D0305F /* DOUAudioStreamer+Options.m in Sources */ = {isa = PBXBuildFile; fileRef = D40A4D1617AB83C400D0305F /* DOUAudioStreamer+Options.m */; };
@@ -55,6 +58,13 @@
 		5F7CF3B2216B59C100498518 /* AUiPodTimeProxy.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AUiPodTimeProxy.m; sourceTree = "<group>"; };
 		5F7CF3B3216B59C100498518 /* AUiPodTimeProxy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AUiPodTimeProxy.h; sourceTree = "<group>"; };
 		5F7CF3B5216B65F200498518 /* sample.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = sample.mp3; sourceTree = "<group>"; };
+		5FECCF78216F95A80019FAFB /* DOUCacheInfo.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOUCacheInfo.h; sourceTree = "<group>"; };
+		5FECCF79216F95A80019FAFB /* DOUCacheInfo.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DOUCacheInfo.m; sourceTree = "<group>"; };
+		5FECCF7B216F9E710019FAFB /* DOUAudioRemoteFileProvider.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOUAudioRemoteFileProvider.h; sourceTree = "<group>"; };
+		5FECCF7C216F9E710019FAFB /* DOUAudioRemoteFileProvider.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DOUAudioRemoteFileProvider.m; sourceTree = "<group>"; };
+		5FECCF7E21703A840019FAFB /* DOUAudioFileProvider_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOUAudioFileProvider_Private.h; sourceTree = "<group>"; };
+		5FECCF7F21707A880019FAFB /* DOUAudioPlayer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOUAudioPlayer.h; sourceTree = "<group>"; };
+		5FECCF8021707A880019FAFB /* DOUAudioPlayer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DOUAudioPlayer.m; sourceTree = "<group>"; };
 		D400E946171BF13F00BE7F37 /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
 		D40A255B17694680000B98AA /* DOUAudioAnalyzer+Default.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "DOUAudioAnalyzer+Default.h"; sourceTree = "<group>"; };
 		D40A255C17694680000B98AA /* DOUAudioAnalyzer+Default.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "DOUAudioAnalyzer+Default.m"; sourceTree = "<group>"; };
@@ -195,6 +205,13 @@
 				D43AFF96176A938100D1FECF /* DOUEAGLView.m */,
 				D43AFF91176A938100D1FECF /* DOUAudioVisualizer.h */,
 				D43AFF92176A938100D1FECF /* DOUAudioVisualizer.m */,
+				5FECCF78216F95A80019FAFB /* DOUCacheInfo.h */,
+				5FECCF79216F95A80019FAFB /* DOUCacheInfo.m */,
+				5FECCF7B216F9E710019FAFB /* DOUAudioRemoteFileProvider.h */,
+				5FECCF7C216F9E710019FAFB /* DOUAudioRemoteFileProvider.m */,
+				5FECCF7E21703A840019FAFB /* DOUAudioFileProvider_Private.h */,
+				5FECCF7F21707A880019FAFB /* DOUAudioPlayer.h */,
+				5FECCF8021707A880019FAFB /* DOUAudioPlayer.m */,
 			);
 			name = DOUAudioStreamer;
 			path = ../../../src;
@@ -298,6 +315,11 @@
 			attributes = {
 				LastUpgradeCheck = 0500;
 				ORGANIZATIONNAME = "Douban Inc.";
+				TargetAttributes = {
+					D4C3891E171B9D87009D6124 = {
+						DevelopmentTeam = 9GAA3WNV3T;
+					};
+				};
 			};
 			buildConfigurationList = D4C3891A171B9D87009D6124 /* Build configuration list for PBXProject "DOUASDemo" */;
 			compatibilityVersion = "Xcode 3.2";
@@ -338,14 +360,17 @@
 			files = (
 				D47CA3A717680AF1002D73B4 /* DOUAudioFrequencyAnalyzer.m in Sources */,
 				D4C3892F171B9D87009D6124 /* main.m in Sources */,
+				5FECCF8121707A880019FAFB /* DOUAudioPlayer.m in Sources */,
 				D40A4D1717AB83C400D0305F /* DOUAudioStreamer+Options.m in Sources */,
 				D47CA3A817680AF1002D73B4 /* DOUAudioSpatialAnalyzer.m in Sources */,
 				5F7CF3B4216B59C200498518 /* AUiPodTimeProxy.m in Sources */,
+				5FECCF7A216F95A80019FAFB /* DOUCacheInfo.m in Sources */,
 				D47CA3A217680ADA002D73B4 /* DOUAudioAnalyzer.m in Sources */,
 				D4C38933171B9D87009D6124 /* AppDelegate.m in Sources */,
 				D43ACD8A1738B47B00E6A571 /* DOUAudioDecoder.m in Sources */,
 				D43AFF97176A938100D1FECF /* DOUAudioVisualizer.m in Sources */,
 				D43AFF99176A938100D1FECF /* DOUEAGLView.m in Sources */,
+				5FECCF7D216F9E710019FAFB /* DOUAudioRemoteFileProvider.m in Sources */,
 				D44920A018A5D12000651CD2 /* DOUMPMediaLibraryAssetLoader.m in Sources */,
 				D43ACD8B1738B47B00E6A571 /* DOUAudioEventLoop.m in Sources */,
 				D43ACD8C1738B47B00E6A571 /* DOUAudioFilePreprocessor.m in Sources */,
@@ -446,6 +471,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_ENABLE_MODULES = YES;
+				DEVELOPMENT_TEAM = 9GAA3WNV3T;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "DOUASDemo/DOUASDemo-Prefix.pch";
 				INFOPLIST_FILE = "DOUASDemo/DOUASDemo-Info.plist";
@@ -459,6 +485,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_ENABLE_MODULES = YES;
+				DEVELOPMENT_TEAM = 9GAA3WNV3T;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "DOUASDemo/DOUASDemo-Prefix.pch";
 				INFOPLIST_FILE = "DOUASDemo/DOUASDemo-Info.plist";

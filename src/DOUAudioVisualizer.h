@@ -17,6 +17,7 @@
 #if TARGET_OS_IPHONE
 
 #import "DOUEAGLView.h"
+#import "DOUAudioPlayer.h"
 
 typedef NS_ENUM(NSUInteger, DOUAudioVisualizerInterpolationType) {
   DOUAudioVisualizerLinearInterpolation,
@@ -28,6 +29,8 @@ typedef NS_ENUM(NSUInteger, DOUAudioVisualizerInterpolationType) {
 @property (nonatomic, assign) NSUInteger stepCount;
 @property (nonatomic, assign) DOUAudioVisualizerInterpolationType interpolationType;
 
+@property (nonatomic, strong) DOUAudioPlayer *player;
+@property (nonatomic, strong) DOUAudioAnalyzer *sharedAnalyzer;
 @end
 
 #endif /* TARGET_OS_IPHONE */

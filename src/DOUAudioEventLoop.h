@@ -20,8 +20,6 @@
 
 @interface DOUAudioEventLoop : NSObject
 
-+ (instancetype)sharedEventLoop;
-
 @property (nonatomic, strong) DOUAudioStreamer *currentStreamer;
 
 @property (nonatomic, assign) NSTimeInterval currentTime;
@@ -33,5 +31,7 @@
 - (void)play;
 - (void)pause;
 - (void)stop;
+
+- (void)reset;
 
 @end

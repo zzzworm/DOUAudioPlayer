@@ -16,8 +16,9 @@
 
 #import "PlayerViewController.h"
 #import "Track.h"
-#import "DOUAudioStreamer.h"
+#import "DOUAudioPlayer.h"
 #import "DOUAudioVisualizer.h"
+#import "DOUAudioStreamer.h"
 
 static void *kStatusKVOKey = &kStatusKVOKey;
 static void *kDurationKVOKey = &kDurationKVOKey;
@@ -33,6 +34,8 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
   UIButton *_buttonNext;
   UIButton *_buttonStop;
 
+    UILabel *_durationLabel;
+    
   UISlider *_progressSlider;
 
   UILabel *_volumeLabel;
@@ -45,7 +48,7 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
   NSUInteger _currentTrackIndex;
   NSTimer *_timer;
 
-  DOUAudioStreamer *_streamer;
+  DOUAudioPlayer *_player;
   DOUAudioVisualizer *_audioVisualizer;
 }
 @end
@@ -96,6 +99,10 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
   [_buttonStop addTarget:self action:@selector(_actionStop:) forControlEvents:UIControlEventTouchDown];
   [view addSubview:_buttonStop];
 
+    _durationLabel = [[UILabel alloc] initWithFrame:CGRectMake(round((CGRectGetWidth([view bounds]) - 160.0) / 2.0), CGRectGetMaxY([_buttonStop frame]), 160.0, 40.0)];
+    [_durationLabel setText:@"Duration:"];
+    [view addSubview:_durationLabel];
+    
   _progressSlider = [[UISlider alloc] initWithFrame:CGRectMake(20.0, CGRectGetMaxY([_buttonStop frame]) + 20.0, CGRectGetWidth([view bounds]) - 20.0 * 2.0, 40.0)];
   [_progressSlider addTarget:self action:@selector(_actionSliderProgress:) forControlEvents:UIControlEventValueChanged];
   [view addSubview:_progressSlider];
@@ -124,6 +131,7 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
     [view addSubview:_rateSlider];
 
   _audioVisualizer = [[DOUAudioVisualizer alloc] initWithFrame:CGRectMake(0.0, CGRectGetMaxY([_rateSlider frame]), CGRectGetWidth([view bounds]), CGRectGetHeight([view bounds]) - CGRectGetMaxY([_rateSlider frame]))];
+    
   [_audioVisualizer setBackgroundColor:[UIColor colorWithRed:239.0 / 255.0 green:244.0 / 255.0 blue:240.0 / 255.0 alpha:1.0]];
   [view addSubview:_audioVisualizer];
 
@@ -132,18 +140,18 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
 
 - (void)_cancelStreamer
 {
-  if (_streamer != nil) {
-    [_streamer pause];
-    [_streamer removeObserver:self forKeyPath:@"status"];
-    [_streamer removeObserver:self forKeyPath:@"duration"];
-    [_streamer removeObserver:self forKeyPath:@"bufferingRatio"];
-    _streamer = nil;
-  }
+//  if (_streamer != nil) {
+//    [_streamer pause];
+//    [_streamer removeObserver:self forKeyPath:@"status"];
+//    [_streamer removeObserver:self forKeyPath:@"duration"];
+//    [_streamer removeObserver:self forKeyPath:@"bufferingRatio"];
+//    _streamer = nil;
+//  }
 }
 
 - (void)_resetStreamer
 {
-  [self _cancelStreamer];
+  
 
     if (0 == [_tracks count])
     {
@@ -154,13 +162,16 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
         Track *track = [_tracks objectAtIndex:_currentTrackIndex];
         NSString *title = [NSString stringWithFormat:@"%@ - %@", track.artist, track.title];
         [_titleLabel setText:title];
-        
-        _streamer = [DOUAudioStreamer streamerWithAudioFile:track];
-        [_streamer addObserver:self forKeyPath:@"status" options:NSKeyValueObservingOptionNew context:kStatusKVOKey];
-        [_streamer addObserver:self forKeyPath:@"duration" options:NSKeyValueObservingOptionNew context:kDurationKVOKey];
-        [_streamer addObserver:self forKeyPath:@"bufferingRatio" options:NSKeyValueObservingOptionNew context:kBufferingRatioKVOKey];
-        
-        [_streamer play];
+        if (nil == _player) {
+            _player = [[DOUAudioPlayer alloc] init];
+
+            [_player addObserver:self forKeyPath:@"status" options:NSKeyValueObservingOptionNew context:kStatusKVOKey];
+            [_player addObserver:self forKeyPath:@"duration" options:NSKeyValueObservingOptionNew context:kDurationKVOKey];
+            [_player addObserver:self forKeyPath:@"bufferingRatio" options:NSKeyValueObservingOptionNew context:kBufferingRatioKVOKey];
+            _audioVisualizer.player = _player;
+        }
+        [_player setAudioFile:track];
+        [_player play];
         
         [self _updateBufferingStatus];
         [self _setupHintForStreamer];
@@ -174,22 +185,23 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
     nextIndex = 0;
   }
 
-  [DOUAudioStreamer setHintWithAudioFile:[_tracks objectAtIndex:nextIndex]];
+  [_player.streamer setHintWithAudioFile:[_tracks objectAtIndex:nextIndex]];
 }
 
 - (void)_timerAction:(id)timer
 {
-  if ([_streamer duration] == 0.0) {
+  if ([_player duration] == 0.0) {
     [_progressSlider setValue:0.0f animated:NO];
   }
   else {
-    [_progressSlider setValue:[_streamer currentTime] / [_streamer duration] animated:YES];
+      _durationLabel.text = [NSString stringWithFormat:@"Duration:%.1f",[_player duration]];
+    [_progressSlider setValue:[_player currentTime] / [_player duration] animated:YES];
   }
 }
 
 - (void)_updateStatus
 {
-  switch ([_streamer status]) {
+  switch ([_player status]) {
   case DOUAudioStreamerPlaying:
     [_statusLabel setText:@"playing"];
     [_buttonPlayPause setTitle:@"Pause" forState:UIControlStateNormal];
@@ -207,7 +219,7 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
 
   case DOUAudioStreamerFinished:
     [_statusLabel setText:@"finished"];
-    [self _actionNext:nil];
+    //[self _actionNext:nil];
     break;
 
   case DOUAudioStreamerBuffering:
@@ -222,10 +234,10 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
 
 - (void)_updateBufferingStatus
 {
-  [_miscLabel setText:[NSString stringWithFormat:@"Received %.2f/%.2f MB (%.2f %%), Speed %.2f MB/s", (double)[_streamer receivedLength] / 1024 / 1024, (double)[_streamer expectedLength] / 1024 / 1024, [_streamer bufferingRatio] * 100.0, (double)[_streamer downloadSpeed] / 1024 / 1024]];
+  [_miscLabel setText:[NSString stringWithFormat:@"Received %.2f/%.2f MB (%.2f %%), Speed %.2f MB/s", (double)[_player.streamer receivedLength] / 1024 / 1024, (double)[_player.streamer expectedLength] / 1024 / 1024, [_player.streamer bufferingRatio] * 100.0, (double)[_player.streamer downloadSpeed] / 1024 / 1024]];
 
-  if ([_streamer bufferingRatio] >= 1.0) {
-    NSLog(@"sha256: %@", [_streamer sha256]);
+  if ([_player.streamer bufferingRatio] >= 1.0) {
+    NSLog(@"sha256: %@", [_player.streamer sha256]);
   }
 }
 
@@ -261,26 +273,25 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
   [self _resetStreamer];
 
   _timer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(_timerAction:) userInfo:nil repeats:YES];
-  [_volumeSlider setValue:[DOUAudioStreamer volume]];
+  [_volumeSlider setValue:[_player volume]];
 }
 
 - (void)viewWillDisappear:(BOOL)animated
 {
   [_timer invalidate];
-  [_streamer stop];
-  [self _cancelStreamer];
+  [_player stop];
 
   [super viewWillDisappear:animated];
 }
 
 - (void)_actionPlayPause:(id)sender
 {
-  if ([_streamer status] == DOUAudioStreamerPaused ||
-      [_streamer status] == DOUAudioStreamerIdle) {
-    [_streamer play];
+  if ([_player status] == DOUAudioStreamerPaused ||
+      [_player status] == DOUAudioStreamerIdle) {
+    [_player play];
   }
   else {
-    [_streamer pause];
+    [_player pause];
   }
 }
 
@@ -295,22 +306,22 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
 
 - (void)_actionStop:(id)sender
 {
-  [_streamer stop];
+  [_player stop];
 }
 
 - (void)_actionSliderProgress:(id)sender
 {
-  [_streamer setCurrentTime:[_streamer duration] * [_progressSlider value]];
+  [_player setCurrentTime:[_player duration] * [_progressSlider value]];
 }
 
 - (void)_actionSliderVolume:(id)sender
 {
-  [DOUAudioStreamer setVolume:[_volumeSlider value]];
+  [_player setVolume:[_volumeSlider value]];
 }
 
 - (void)_actionSliderRate:(id)sender
 {
-    [DOUAudioStreamer setRate:[_rateSlider value]];
+    [_player setRate:[_rateSlider value]];
     _rateValLabel.text = [NSString stringWithFormat:@"%.2f",[_rateSlider value]];
 }
 

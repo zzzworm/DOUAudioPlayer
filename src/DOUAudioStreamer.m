@@ -18,6 +18,7 @@
 #import "DOUAudioStreamer_Private.h"
 #import "DOUAudioFileProvider.h"
 #import "DOUAudioEventLoop.h"
+#import "DOUAudioStreamer+Options.h"
 
 NSString *const kDOUAudioStreamerErrorDomain = @"com.douban.audio-streamer.error-domain";
 
@@ -34,7 +35,8 @@ NSString *const kDOUAudioStreamerErrorDomain = @"com.douban.audio-streamer.error
   DOUAudioFileProvider *_fileProvider;
   DOUAudioPlaybackItem *_playbackItem;
   DOUAudioDecoder *_decoder;
-
+    
+    
   double _bufferingRatio;
 
 #if TARGET_OS_IPHONE
@@ -73,50 +75,21 @@ NSString *const kDOUAudioStreamerErrorDomain = @"com.douban.audio-streamer.error
     _audioFile = audioFile;
     _status = DOUAudioStreamerIdle;
 
-    _fileProvider = [DOUAudioFileProvider fileProviderWithAudioFile:_audioFile];
+    _fileProvider = [DOUAudioFileProvider fileProviderWithAudioFile:_audioFile config:self.config];
     if (_fileProvider == nil) {
       return nil;
     }
 
     _bufferingRatio = (double)[_fileProvider receivedLength] / [_fileProvider expectedLength];
+    
   }
 
   return self;
 }
 
-+ (double)volume
+- (void)setHintWithAudioFile:(id <DOUAudioFile>)audioFile
 {
-  return [[DOUAudioEventLoop sharedEventLoop] volume];
-}
-
-+ (void)setVolume:(double)volume
-{
-  [[DOUAudioEventLoop sharedEventLoop] setVolume:volume];
-}
-
-+ (double)rate
-{
-    return [[DOUAudioEventLoop sharedEventLoop] rate];
-}
-
-+ (void)setRate:(double)rate
-{
-    [[DOUAudioEventLoop sharedEventLoop] setRate:rate];
-}
-
-+ (NSArray *)analyzers
-{
-  return [[DOUAudioEventLoop sharedEventLoop] analyzers];
-}
-
-+ (void)setAnalyzers:(NSArray *)analyzers
-{
-  [[DOUAudioEventLoop sharedEventLoop] setAnalyzers:analyzers];
-}
-
-+ (void)setHintWithAudioFile:(id <DOUAudioFile>)audioFile
-{
-  [DOUAudioFileProvider setHintWithAudioFile:audioFile];
+  [_fileProvider setHintWithAudioFile:audioFile];
 }
 
 - (id <DOUAudioFile>)audioFile
@@ -127,44 +100,6 @@ NSString *const kDOUAudioStreamerErrorDomain = @"com.douban.audio-streamer.error
 - (NSURL *)url
 {
   return [_audioFile audioFileURL];
-}
-
-- (NSTimeInterval)currentTime
-{
-  if ([[DOUAudioEventLoop sharedEventLoop] currentStreamer] != self) {
-    return 0.0;
-  }
-
-  return [[DOUAudioEventLoop sharedEventLoop] currentTime];
-}
-
-- (void)setCurrentTime:(NSTimeInterval)currentTime
-{
-  if ([[DOUAudioEventLoop sharedEventLoop] currentStreamer] != self) {
-    return;
-  }
-
-  [[DOUAudioEventLoop sharedEventLoop] setCurrentTime:currentTime];
-}
-
-- (double)volume
-{
-  return [[self class] volume];
-}
-
-- (void)setVolume:(double)volume
-{
-  [[self class] setVolume:volume];
-}
-
-- (NSArray *)analyzers
-{
-  return [[self class] analyzers];
-}
-
-- (void)setAnalyzers:(NSArray *)analyzers
-{
-  [[self class] setAnalyzers:analyzers];
 }
 
 - (NSString *)cachedPath
@@ -195,57 +130,6 @@ NSString *const kDOUAudioStreamerErrorDomain = @"com.douban.audio-streamer.error
 - (NSUInteger)downloadSpeed
 {
   return [_fileProvider downloadSpeed];
-}
-
-- (void)play
-{
-  @synchronized(self) {
-    if (_status != DOUAudioStreamerPaused &&
-        _status != DOUAudioStreamerIdle &&
-        _status != DOUAudioStreamerFinished) {
-      return;
-    }
-
-    if ([[DOUAudioEventLoop sharedEventLoop] currentStreamer] != self) {
-      [[DOUAudioEventLoop sharedEventLoop] pause];
-      [[DOUAudioEventLoop sharedEventLoop] setCurrentStreamer:self];
-    }
-
-    [[DOUAudioEventLoop sharedEventLoop] play];
-  }
-}
-
-- (void)pause
-{
-  @synchronized(self) {
-    if (_status == DOUAudioStreamerPaused ||
-        _status == DOUAudioStreamerIdle ||
-        _status == DOUAudioStreamerFinished) {
-      return;
-    }
-
-    if ([[DOUAudioEventLoop sharedEventLoop] currentStreamer] != self) {
-      return;
-    }
-
-    [[DOUAudioEventLoop sharedEventLoop] pause];
-  }
-}
-
-- (void)stop
-{
-  @synchronized(self) {
-    if (_status == DOUAudioStreamerIdle) {
-      return;
-    }
-
-    if ([[DOUAudioEventLoop sharedEventLoop] currentStreamer] != self) {
-      return;
-    }
-
-    [[DOUAudioEventLoop sharedEventLoop] stop];
-    [[DOUAudioEventLoop sharedEventLoop] setCurrentStreamer:nil];
-  }
 }
 
 @end

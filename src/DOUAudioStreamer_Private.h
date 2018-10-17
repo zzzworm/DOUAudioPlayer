@@ -21,6 +21,9 @@
 @class DOUAudioDecoder;
 
 @interface DOUAudioStreamer ()
+{
+    DOUAudioStreamerConfig *_config;
+}
 
 @property (assign) DOUAudioStreamerStatus status;
 @property (strong) NSError *error;

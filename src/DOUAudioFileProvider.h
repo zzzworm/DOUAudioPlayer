@@ -16,13 +16,17 @@
 
 #import <Foundation/Foundation.h>
 #import "DOUAudioFile.h"
+#import "DOUAudioStreamer.h"
+
+@class DOUAudioFileProvider;
 
 typedef void (^DOUAudioFileProviderEventBlock)(void);
+extern DOUAudioFileProvider *gHintProvider;
 
 @interface DOUAudioFileProvider : NSObject
 
-+ (instancetype)fileProviderWithAudioFile:(id <DOUAudioFile>)audioFile;
-+ (void)setHintWithAudioFile:(id <DOUAudioFile>)audioFile;
++ (instancetype)fileProviderWithAudioFile:(id <DOUAudioFile>)audioFile config:(DOUAudioStreamerConfig *)configs;
+- (void)setHintWithAudioFile:(id <DOUAudioFile>)audioFile;
 
 @property (nonatomic, readonly) id <DOUAudioFile> audioFile;
 @property (nonatomic, copy) DOUAudioFileProviderEventBlock eventBlock;
@@ -43,5 +47,14 @@ typedef void (^DOUAudioFileProviderEventBlock)(void);
 @property (nonatomic, readonly, getter=isFailed) BOOL failed;
 @property (nonatomic, readonly, getter=isReady) BOOL ready;
 @property (nonatomic, readonly, getter=isFinished) BOOL finished;
+
+@property (nonatomic, strong) DOUAudioStreamerConfig *config;
+
+@property (nonatomic, strong) id <DOUAudioFile> hintFile;
+@property (nonatomic, strong) DOUAudioFileProvider *hintProvider;
+@property (nonatomic, assign) BOOL lastProviderIsFinished;
+@property (nonatomic, assign, readonly) double bufferingRatio;
+
+- (void)seekTo:(unsigned long long)packetDataOffset;
 
 @end

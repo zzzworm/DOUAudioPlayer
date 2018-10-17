@@ -39,6 +39,7 @@
 @property (nonatomic, readonly) NSUInteger bitRate;
 @property (nonatomic, readonly) NSUInteger dataOffset;
 @property (nonatomic, readonly) NSUInteger estimatedDuration;
+@property (nonatomic, readonly) NSUInteger audioDataByteCount;
 
 @property (nonatomic, readonly, getter=isOpened) BOOL opened;
 

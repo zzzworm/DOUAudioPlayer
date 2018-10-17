@@ -56,48 +56,24 @@
 
 @synthesize stepCount = _stepCount;
 @synthesize interpolationType = _interpolationType;
+@synthesize player = _player;
+@synthesize sharedAnalyzer = _sharedAnalyzer;
 
 #pragma mark - Shared Analyzer
 
-+ (void)_applicationDidEnterBackgroundNotification:(NSNotification *)notification
+- (DOUAudioAnalyzer *)sharedAnalyzer
 {
-  [[self _sharedAnalyzer] setEnabled:NO];
-}
+    if (nil == _sharedAnalyzer) {
+        _sharedAnalyzer = [DOUAudioAnalyzer frequencyAnalyzer];
+        [_sharedAnalyzer setEnabled:YES];
+        [_player setAnalyzers:@[_sharedAnalyzer]];
+        
+        [self performSelector:@selector(_setupNotifications)
+                   withObject:nil
+                   afterDelay:0.0];
+    }
 
-+ (void)_applicationWillEnterForegroundNotification:(NSNotification *)notification
-{
-  [[self _sharedAnalyzer] setEnabled:YES];
-}
-
-+ (void)_setupNotifications
-{
-  [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(_applicationDidEnterBackgroundNotification:)
-                                               name:UIApplicationDidEnterBackgroundNotification
-                                             object:nil];
-
-  [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(_applicationWillEnterForegroundNotification:)
-                                               name:UIApplicationWillEnterForegroundNotification
-                                             object:nil];
-}
-
-+ (DOUAudioAnalyzer *)_sharedAnalyzer
-{
-  static DOUAudioAnalyzer *sharedAnalyzer = nil;
-
-  static dispatch_once_t onceToken;
-  dispatch_once(&onceToken, ^{
-    sharedAnalyzer = [DOUAudioAnalyzer frequencyAnalyzer];
-    [sharedAnalyzer setEnabled:YES];
-    [DOUAudioStreamer setAnalyzers:@[sharedAnalyzer]];
-
-    [self performSelector:@selector(_setupNotifications)
-               withObject:nil
-               afterDelay:0.0];
-  });
-
-  return sharedAnalyzer;
+  return _sharedAnalyzer;
 }
 
 #pragma mark - Miscellaneous
@@ -105,11 +81,13 @@
 - (void)_applicationDidEnterBackgroundNotification:(NSNotification *)notification
 {
   [self setPaused:YES];
+    [self.sharedAnalyzer setEnabled:NO];
 }
 
 - (void)_applicationWillEnterForegroundNotification:(NSNotification *)notification
 {
   [self setPaused:NO];
+    [self.sharedAnalyzer setEnabled:YES];
 }
 
 - (void)_setupNotifications
@@ -190,7 +168,7 @@
   if (++_step > _stepCount) {
     _step = 0;
     memcpy(_levels.last, _levels.current, sizeof(float) * kDOUAudioAnalyzerLevelCount);
-    [[[self class] _sharedAnalyzer] copyLevels:_levels.current];
+    [self.sharedAnalyzer copyLevels:_levels.current];
   }
 }
 

@@ -73,18 +73,6 @@ typedef NS_ENUM(uint64_t, event_type) {
 @synthesize currentStreamer = _currentStreamer;
 @dynamic analyzers;
 
-+ (instancetype)sharedEventLoop
-{
-  static DOUAudioEventLoop *sharedEventLoop = nil;
-
-  static dispatch_once_t onceToken;
-  dispatch_once(&onceToken, ^{
-    sharedEventLoop = [[DOUAudioEventLoop alloc] init];
-  });
-
-  return sharedEventLoop;
-}
-
 - (instancetype)init
 {
   self = [super init];
@@ -346,7 +334,9 @@ static void audio_route_change_listener(void *inClientData,
   else if (event == event_streamer_changed) {
     [_renderer stop];
     [_renderer flush];
-
+      
+      [*streamer setDecoder:nil];
+      [*streamer setPlaybackItem:nil];
     [[*streamer fileProvider] setEventBlock:NULL];
     *streamer = _currentStreamer;
     [[*streamer fileProvider] setEventBlock:_fileProviderEventBlock];
@@ -357,7 +347,7 @@ static void audio_route_change_listener(void *inClientData,
       [*streamer setStatus:DOUAudioStreamerPlaying];
     }
 
-    [*streamer setBufferingRatio:(double)[[*streamer fileProvider] receivedLength] / [[*streamer fileProvider] expectedLength]];
+    [*streamer setBufferingRatio:[[*streamer fileProvider] bufferingRatio]];
   }
   else if (event == event_finalizing) {
     return NO;
@@ -424,7 +414,7 @@ static void audio_route_change_listener(void *inClientData,
     return;
   }
 
-  if ([streamer status] != DOUAudioStreamerPlaying) {
+  if ([streamer status] != DOUAudioStreamerPlaying && [streamer status] != DOUAudioStreamerError && [streamer status] != DOUAudioStreamerBuffering) {
     return;
   }
 
@@ -468,6 +458,10 @@ static void audio_route_change_listener(void *inClientData,
 
   switch ([[streamer decoder] decodeOnce]) {
   case DOUAudioDecoderSucceeded:
+          if ([streamer status] != DOUAudioStreamerPlaying) {
+              [streamer setStatus:DOUAudioStreamerPlaying];
+          [self render:streamer];
+          }
     break;
 
   case DOUAudioDecoderFailed:
@@ -489,13 +483,18 @@ static void audio_route_change_listener(void *inClientData,
     return;
   }
 
-  void *bytes = NULL;
-  NSUInteger length = 0;
-  [[[streamer decoder] lpcm] readBytes:&bytes length:&length];
-  if (bytes != NULL) {
-    [_renderer renderBytes:bytes length:length];
-    free(bytes);
-  }
+    [self render:streamer];
+}
+
+- (void)render:(DOUAudioStreamer *)streamer
+{
+    void *bytes = NULL;
+    NSUInteger length = 0;
+    [[[streamer decoder] lpcm] readBytes:&bytes length:&length];
+    if (bytes != NULL) {
+        [_renderer renderBytes:bytes length:length];
+        free(bytes);
+    }
 }
 
 - (void)_eventLoop
@@ -576,6 +575,11 @@ static void *event_loop_main(void *info)
   }
 }
 
+- (void)reset
+{
+    [self _sendEvent:event_streamer_changed];
+}
+
 - (NSTimeInterval)currentTime
 {
   return (NSTimeInterval)((NSUInteger)[[self currentStreamer] timingOffset] + [_renderer currentTime]) / 1000.0;
@@ -596,7 +600,7 @@ static void *event_loop_main(void *info)
 {
   [_renderer setVolume:volume];
 
-  if ([DOUAudioStreamer options] & DOUAudioStreamerKeepPersistentVolume) {
+  if ([_currentStreamer options] & DOUAudioStreamerKeepPersistentVolume) {
     [[NSUserDefaults standardUserDefaults] setDouble:volume
                                               forKey:kDOUAudioStreamerVolumeKey];
   }

@@ -78,7 +78,8 @@ static CFRunLoopRef controller_get_runloop()
   DOUSimpleHTTPRequestProgressBlock _progressBlock;
   DOUSimpleHTTPRequestDidReceiveResponseBlock _didReceiveResponseBlock;
   DOUSimpleHTTPRequestDidReceiveDataBlock _didReceiveDataBlock;
-
+    
+    NSURL *_url;
   NSString *_userAgent;
   NSTimeInterval _timeoutInterval;
 
@@ -136,7 +137,7 @@ static CFRunLoopRef controller_get_runloop()
   if (self) {
     _userAgent = [[self class] defaultUserAgent];
     _timeoutInterval = [[self class] defaultTimeoutInterval];
-
+      _url = url;
     _message = CFHTTPMessageCreateRequest(kCFAllocatorDefault, CFSTR("GET"), (__bridge CFURLRef)url, kCFHTTPVersion1_1);
   }
 
@@ -415,12 +416,38 @@ static void response_stream_client_callback(CFReadStreamRef stream, CFStreamEven
   if (_host != nil) {
     CFHTTPMessageSetHeaderFieldValue(_message, CFSTR("Host"), (__bridge CFStringRef)_host);
   }
+    
+    if (_position > 0 ) {
+        NSString *range;
+        if (0 == _length) {
+            range = [NSString stringWithFormat:@"bytes=%llu-",_position];
+        }
+        else{
+            range = [NSString stringWithFormat:@"bytes=%llu-%llu",_position,(_position+_length)];
+        }
+        CFHTTPMessageSetHeaderFieldValue(_message, CFSTR("Range"), (__bridge CFStringRef)range);
+    }
+    
+    [_reqHeaders enumerateKeysAndObjectsUsingBlock:^(NSString * _Nonnull key, NSString * _Nonnull obj, BOOL * _Nonnull stop) {
+        CFHTTPMessageSetHeaderFieldValue(_message, (__bridge CFStringRef)key, (__bridge CFStringRef)obj);
+    }];
 
   _responseStream = CFReadStreamCreateForHTTPRequest(kCFAllocatorDefault, _message);
   CFReadStreamSetProperty(_responseStream, kCFStreamPropertyHTTPShouldAutoredirect, kCFBooleanTrue);
   CFReadStreamSetProperty(_responseStream, CFSTR("_kCFStreamPropertyReadTimeout"), (__bridge CFNumberRef)[NSNumber numberWithDouble:_timeoutInterval]);
   CFReadStreamSetProperty(_responseStream, CFSTR("_kCFStreamPropertyWriteTimeout"), (__bridge CFNumberRef)[NSNumber numberWithDouble:_timeoutInterval]);
 
+    
+    // SSL Support
+    if ([_url.scheme.lowercaseString isEqualToString:@"https"]){
+        NSDictionary *sslSettings = @{
+                                          (__bridge id) kCFStreamSocketSecurityLevelNegotiatedSSL: @(false),
+                                          (__bridge id)kCFStreamSSLLevel: (__bridge id)kCFStreamSSLValidatesCertificateChain,
+                                          (__bridge id)kCFStreamSSLPeerName : [NSNull null],
+                                          };
+        CFReadStreamSetProperty(_responseStream, kCFStreamPropertySSLSettings,(__bridge CFTypeRef _Null_unspecified)(sslSettings));
+    }
+    
   CFStreamClientContext context;
   bzero(&context, sizeof(context));
   context.info = (__bridge void *)self;

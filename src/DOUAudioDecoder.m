@@ -20,6 +20,10 @@
 #import "DOUAudioLPCM.h"
 #include <AudioToolbox/AudioToolbox.h>
 #include <pthread.h>
+#import "DOUAudioRemoteFileProvider.h"
+
+#define BitRateEstimationMaxPackets 5000
+#define BitRateEstimationMinPackets 50
 
 typedef struct {
   AudioFileID afid;
@@ -46,7 +50,9 @@ typedef struct {
 
   UInt32 numOutputPackets;
   SInt64 outputPos;
-
+    
+    NSUInteger seekMilliseconds;
+    
   pthread_mutex_t mutex;
 } DecodingContext;
 
@@ -61,6 +67,8 @@ typedef struct {
   NSUInteger _bufferSize;
   DecodingContext _decodingContext;
   BOOL _decodingContextInitialized;
+    
+    NSUInteger estimatedDuration;
 }
 @end
 
@@ -310,6 +318,7 @@ static OSStatus decoder_data_proc(AudioConverterRef inAudioConverter, UInt32 *io
   }
 
   UInt32 outNumBytes;
+    UInt32 inNumberDataPackets = *ioNumberDataPackets;
   OSStatus status = AudioFileReadPackets(afio->afid, FALSE, &outNumBytes, afio->pktDescs, afio->pos, ioNumberDataPackets, afio->srcBuffer);
   if (status != noErr) {
     return status;
@@ -346,7 +355,7 @@ static OSStatus decoder_data_proc(AudioConverterRef inAudioConverter, UInt32 *io
     NSUInteger dataOffset = [_playbackItem dataOffset];
     NSUInteger expectedDataLength = [provider expectedLength];
     NSInteger receivedDataLength  = (NSInteger)([provider receivedLength] - dataOffset);
-
+      
     SInt64 packetNumber = _decodingContext.afio.pos + _decodingContext.afio.numPacketsPerRead;
     SInt64 packetDataOffset = packetNumber * _decodingContext.afio.srcSizePerPacket;
 
@@ -359,10 +368,54 @@ static OSStatus decoder_data_proc(AudioConverterRef inAudioConverter, UInt32 *io
 
     double downloadTime = 1000.0 * (bytesPerRead - (receivedDataLength - packetDataOffset)) / [provider downloadSpeed];
     SInt64 bytesRemaining = (SInt64)(expectedDataLength - (NSUInteger)receivedDataLength);
+      
+      if (0 == estimatedDuration) {
+          estimatedDuration = [_playbackItem estimatedDuration];
+      }
+      if (receivedDataLength < 0) {
+          pthread_mutex_unlock(&_decodingContext.mutex);
+          return DOUAudioDecoderWaiting;
+      }
+      SInt64 seekByteOffset = dataOffset + floor((double)_decodingContext.seekMilliseconds/estimatedDuration* (expectedDataLength - dataOffset));
+      
+    if ((receivedDataLength + dataOffset) < seekByteOffset) {
 
-    if (receivedDataLength < packetDataOffset ||
-        (bytesRemaining > 0 &&
-        downloadTime > intervalPerRead)) {
+            
+            double calculatedBitRate;
+
+            double packetDuration = framesPerPacket / _decodingContext.inputFormat.mSampleRate;
+            if (packetDuration && _decodingContext.afio.pos > BitRateEstimationMinPackets)
+            {
+                calculatedBitRate = 8.0 * bytesPerRead / packetDuration;
+            }
+            
+            if (packetDuration > 0 &&
+                calculatedBitRate > 0)
+            {
+                UInt32 ioFlags = 0;
+                SInt64 packetAlignedByteOffset;
+                SInt64 seekPacket = floor((double)_decodingContext.seekMilliseconds / packetDuration);
+
+                // Ask the file stream for the boundary for the appropriate packet
+                OSStatus err = AudioFileStreamSeek(
+                                                   [(_DOUAudioRemoteFileProvider *)provider audioFileStreamID], seekPacket, &packetAlignedByteOffset, &ioFlags);
+
+                // Only use the boundary if it is NOT estimated
+                // -- otherwise, stay with our first guess
+                if (!err && !(ioFlags & kAudioFileStreamSeekFlag_OffsetIsEstimated))
+                {
+                    seekByteOffset = packetAlignedByteOffset + dataOffset;
+                }
+            }
+            //
+            // Attempt to leave 1 useful packet at the end of the file (although in
+            // reality, this may still seek too far if the file has a long trailer).
+            //
+            if (seekByteOffset > expectedDataLength - 2 * _decodingContext.outputBufferSize)
+            {
+                seekByteOffset = expectedDataLength - 2 * _decodingContext.outputBufferSize;
+            }
+            [provider seekTo:seekByteOffset];
       pthread_mutex_unlock(&_decodingContext.mutex);
       return DOUAudioDecoderWaiting;
     }
@@ -384,6 +437,14 @@ static OSStatus decoder_data_proc(AudioConverterRef inAudioConverter, UInt32 *io
   }
 
   if (ioOutputDataPackets == 0) {
+      if (![provider isFinished]) {
+          pthread_mutex_unlock(&_decodingContext.mutex);
+          return DOUAudioDecoderWaiting;
+      }
+      //debug
+      pthread_mutex_unlock(&_decodingContext.mutex);
+      return DOUAudioDecoderFailed;
+      
     [_lpcm setEnd:YES];
     pthread_mutex_unlock(&_decodingContext.mutex);
     return DOUAudioDecoderEndEncountered;
@@ -414,6 +475,7 @@ static OSStatus decoder_data_proc(AudioConverterRef inAudioConverter, UInt32 *io
   return DOUAudioDecoderSucceeded;
 }
 
+
 - (void)seekToTime:(NSUInteger)milliseconds
 {
   if (!_decodingContextInitialized) {
@@ -428,7 +490,14 @@ static OSStatus decoder_data_proc(AudioConverterRef inAudioConverter, UInt32 *io
 
   _decodingContext.afio.pos = packetNumebr;
   _decodingContext.outputPos = packetNumebr * _decodingContext.inputFormat.mFramesPerPacket / _decodingContext.outputFormat.mFramesPerPacket;
-  
+    _decodingContext.seekMilliseconds = milliseconds;
+    
+    OSStatus status;
+
+    status = AudioConverterReset(_audioConverter);
+    if (status != noErr) {
+        
+    }
   pthread_mutex_unlock(&_decodingContext.mutex);
 }
 
