@@ -21,53 +21,53 @@
 
 + (void)load
 {
-  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
-    [self remoteTracks];
-  });
-
-  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
-    [self musicLibraryTracks];
-  });
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
+        [self remoteTracks];
+    });
+    
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
+        [self musicLibraryTracks];
+    });
 }
 
 + (NSArray *)remoteTracks
 {
-//  static NSArray *tracks = nil;
-//
-//  static dispatch_once_t onceToken;
-//  dispatch_once(&onceToken, ^{
-//    NSURLRequest *request = [NSURLRequest requestWithURL:[NSURL URLWithString:@"http://douban.fm/j/mine/playlist?type=n&channel=1004693&from=mainsite"]];
-//    NSData *data = [NSURLConnection sendSynchronousRequest:request
-//                                         returningResponse:NULL
-//                                                     error:NULL];
-//    NSString *string = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-//    NSDictionary *dict = [NSJSONSerialization JSONObjectWithData:[string dataUsingEncoding:NSUTF8StringEncoding] options:0 error:NULL];
-//
-//    NSMutableArray *allTracks = [NSMutableArray array];
-//    for (NSDictionary *song in [dict objectForKey:@"song"]) {
-//      Track *track = [[Track alloc] init];
-//      [track setArtist:[song objectForKey:@"artist"]];
-//      [track setTitle:[song objectForKey:@"title"]];
-//      [track setAudioFileURL:[NSURL URLWithString:[song objectForKey:@"url"]]];
-//      [allTracks addObject:track];
+    //  static NSArray *tracks = nil;
+    //
+    //  static dispatch_once_t onceToken;
+    //  dispatch_once(&onceToken, ^{
+    //    NSURLRequest *request = [NSURLRequest requestWithURL:[NSURL URLWithString:@"http://douban.fm/j/mine/playlist?type=n&channel=1004693&from=mainsite"]];
+    //    NSData *data = [NSURLConnection sendSynchronousRequest:request
+    //                                         returningResponse:NULL
+    //                                                     error:NULL];
+    //    NSString *string = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    //    NSDictionary *dict = [NSJSONSerialization JSONObjectWithData:[string dataUsingEncoding:NSUTF8StringEncoding] options:0 error:NULL];
+    //
+    //    NSMutableArray *allTracks = [NSMutableArray array];
+    //    for (NSDictionary *song in [dict objectForKey:@"song"]) {
+    //      Track *track = [[Track alloc] init];
+    //      [track setArtist:[song objectForKey:@"artist"]];
+    //      [track setTitle:[song objectForKey:@"title"]];
+    //      [track setAudioFileURL:[NSURL URLWithString:[song objectForKey:@"url"]]];
+    //      [allTracks addObject:track];
+    //    }
+    //
+    //    tracks = [allTracks copy];
+    //  });
+    NSMutableArray *allTracks = [NSMutableArray array];
+//    {
+//        Track *track = [[Track alloc] init];
+//        [track setArtist:@"test"];
+//        [track setTitle:@"sound"];
+//        [track setAudioFileURL:[[NSBundle mainBundle] URLForResource:@"sample" withExtension:@"m4a"]];
+//        [allTracks addObject:track];
 //    }
-//
-//    tracks = [allTracks copy];
-//  });
-NSMutableArray *allTracks = [NSMutableArray array];
-    {
-    Track *track = [[Track alloc] init];
-  [track setArtist:@"test"];
-  [track setTitle:@"sound"];
-  [track setAudioFileURL:[[NSBundle mainBundle] URLForResource:@"sample" withExtension:@"mp3"] ];
-    [allTracks addObject:track];
-    }
-
+    //
     {
         Track *track = [[Track alloc] init];
     [track setArtist:@"china audio"];
     [track setTitle:@"ximalaya audio 1"];
-    [track setAudioFileURL:[NSURL URLWithString:@"http://cdn.lizhi.fm/audio/2015/07/29/21788873806329222_hd.mp3"]];
+    [track setAudioFileURL:[NSURL URLWithString:@"http://127.0.0.1:8000/Episodem_meta_end.m4a"]];
     [allTracks addObject:track];
     }
     
@@ -75,41 +75,41 @@ NSMutableArray *allTracks = [NSMutableArray array];
         Track *track = [[Track alloc] init];
         [track setArtist:@"host audio"];
         [track setTitle:@"ximalaya audio 2"];
-        [track setAudioFileURL:[NSURL URLWithString:@"http://audio.xmcdn.com/group40/M01/6F/7F/wKgJVFreBVvxgalhAArdXwr0RBs920.m4a"]];
+        [track setAudioFileURL:[NSURL URLWithString:@"http://cdn.lizhi.fm/audio/2015/07/29/21788873806329222_hd.mp3"]];
         [allTracks addObject:track];
         
     }
-  return allTracks;
+    return allTracks;
 }
 
 + (NSArray *)musicLibraryTracks
 {
-  static NSArray *tracks = nil;
-
-  static dispatch_once_t onceToken;
-  dispatch_once(&onceToken, ^{
-    NSMutableArray *allTracks = [NSMutableArray array];
-    for (MPMediaItem *item in [[MPMediaQuery songsQuery] items]) {
-      if ([[item valueForProperty:MPMediaItemPropertyIsCloudItem] boolValue]) {
-        continue;
-      }
-
-      Track *track = [[Track alloc] init];
-      [track setArtist:[item valueForProperty:MPMediaItemPropertyArtist]];
-      [track setTitle:[item valueForProperty:MPMediaItemPropertyTitle]];
-      [track setAudioFileURL:[item valueForProperty:MPMediaItemPropertyAssetURL]];
-      [allTracks addObject:track];
-    }
-
-    for (NSUInteger i = 0; i < [allTracks count]; ++i) {
-      NSUInteger j = arc4random_uniform((u_int32_t)[allTracks count]);
-      [allTracks exchangeObjectAtIndex:i withObjectAtIndex:j];
-    }
-
-    tracks = [allTracks copy];
-  });
-
-  return tracks;
+    static NSArray *tracks = nil;
+    
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSMutableArray *allTracks = [NSMutableArray array];
+        for (MPMediaItem *item in [[MPMediaQuery songsQuery] items]) {
+            if ([[item valueForProperty:MPMediaItemPropertyIsCloudItem] boolValue]) {
+                continue;
+            }
+            
+            Track *track = [[Track alloc] init];
+            [track setArtist:[item valueForProperty:MPMediaItemPropertyArtist]];
+            [track setTitle:[item valueForProperty:MPMediaItemPropertyTitle]];
+            [track setAudioFileURL:[item valueForProperty:MPMediaItemPropertyAssetURL]];
+            [allTracks addObject:track];
+        }
+        
+        for (NSUInteger i = 0; i < [allTracks count]; ++i) {
+            NSUInteger j = arc4random_uniform((u_int32_t)[allTracks count]);
+            [allTracks exchangeObjectAtIndex:i withObjectAtIndex:j];
+        }
+        
+        tracks = [allTracks copy];
+    });
+    
+    return tracks;
 }
 
 @end

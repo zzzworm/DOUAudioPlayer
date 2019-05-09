@@ -21,7 +21,8 @@ typedef NS_ENUM(NSUInteger, DOUAudioDecoderStatus) {
   DOUAudioDecoderSucceeded,
   DOUAudioDecoderFailed,
   DOUAudioDecoderEndEncountered,
-  DOUAudioDecoderWaiting
+  DOUAudioDecoderWaiting,
+  DOUAudioDecoderRefreshing,
 };
 
 @class DOUAudioPlaybackItem;

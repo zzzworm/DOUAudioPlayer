@@ -12,6 +12,7 @@
 #import "DOUCacheInfo.h"
 #import "DOUAudioDecoder.h"
 #include <CoreAudio/CoreAudioTypes.h>
+#include <pthread.h>
 
 #define BitRateEstimationMaxPackets 5000
 #define BitRateEstimationMinPackets 50
@@ -21,7 +22,6 @@
 @interface _DOUAudioRemoteFileProvider()
 
 @property (nonatomic, strong) DOUCacheInfo *cacheInfo;
-@property (nonatomic, assign) NSRange currentReceivedRange;
 
 @end
 
@@ -35,7 +35,12 @@
         if ([audioFile respondsToSelector:@selector(audioFileHost)]) {
             _audioFileHost = [audioFile audioFileHost];
         }
+        pthread_mutexattr_t attr;
         
+        pthread_mutexattr_init(&attr);
+        pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+        
+        pthread_mutex_init(&_dataMutex, &attr);
         [self _openAudioFileStream];
         [self _createRequest];
         [_request start];
@@ -49,8 +54,18 @@
     return _audioFileStreamID;
 }
 
-- (void)dealloc
+- (AudioFileID)audioFileID
 {
+    return _audioFileID;
+}
+
+
+- (AudioFileTypeID)audioFileTypeID
+{
+    return _audioFileTypeID;
+}
+
+- (void)cancelRequest {
     @synchronized(_request) {
         [_request setCompletedBlock:NULL];
         [_request setProgressBlock:NULL];
@@ -59,12 +74,19 @@
         
         [_request cancel];
     }
+}
+
+- (void)dealloc
+{
+    [self cancelRequest];
     
     if (_sha256Ctx != NULL) {
         free(_sha256Ctx);
     }
     
     [self _closeAudioFileStream];
+    
+    [self _closeAudioFile];
     
     if (self.config.options & DOUAudioStreamerRemoveCacheOnDeallocation) {
         [[NSFileManager defaultManager] removeItemAtPath:_cachedPath error:NULL];
@@ -106,14 +128,19 @@
 
 - (void)_requestDidComplete
 {
+    self->_requringRanges = nil;
     if ([_request isFailed] ||
         !([_request statusCode] >= 200 && [_request statusCode] < 300)) {
         _failed = YES;
     }
     else {
+        pthread_mutex_lock(&_dataMutex);
         [_mappedData dou_synchronizeMappedFile];
+        pthread_mutex_unlock(&_dataMutex);
     }
-    
+    if (!_failed && _requireAudioFileAPI && !_audioFileID) {
+        _failed = YES;
+    }
     if (!_failed &&
         _sha256Ctx != NULL) {
         unsigned char hash[CC_SHA256_DIGEST_LENGTH];
@@ -127,7 +154,7 @@
         _sha256 = [result copy];
     }
     
-    if (self.hintFile != nil &&
+    if (self.isFinished && self.hintFile != nil &&
         self.hintProvider == nil) {
         self.hintProvider = [[[self class] alloc] _initWithAudioFile:self.hintFile config:self.config];
     }
@@ -137,7 +164,7 @@
 
 - (void)_requestDidReportProgress:(double)progress
 {
-    [self _invokeEventBlock];
+    //[self _invokeEventBlock];
 }
 
 - (void)_requestDidReceiveResponse
@@ -149,26 +176,25 @@
         _expectedLength = _request.position + [_request responseContentLength];
     }
     if (nil == _cachedURL) {
-            
-    _cachedPath = [[self class] _cachedPathForAudioFileURL:_audioFileURL];
-    _cachedURL = [NSURL fileURLWithPath:_cachedPath];
-    
-    [[NSFileManager defaultManager] createFileAtPath:_cachedPath contents:nil attributes:nil];
+        
+        _cachedPath = [[self class] _cachedPathForAudioFileURL:_audioFileURL];
+        _cachedURL = [NSURL fileURLWithPath:_cachedPath];
+        
+        [[NSFileManager defaultManager] createFileAtPath:_cachedPath contents:nil attributes:nil];
 #if TARGET_OS_IPHONE
-    [[NSFileManager defaultManager] setAttributes:@{NSFileProtectionKey: NSFileProtectionNone}
-                                     ofItemAtPath:_cachedPath
-                                            error:NULL];
+        [[NSFileManager defaultManager] setAttributes:@{NSFileProtectionKey: NSFileProtectionNone}
+                                         ofItemAtPath:_cachedPath
+                                                error:NULL];
 #endif /* TARGET_OS_IPHONE */
-    [[NSFileHandle fileHandleForWritingAtPath:_cachedPath] truncateFileAtOffset:_expectedLength];
-    
-    _mimeType = [[_request responseHeaders] objectForKey:@"Content-Type"];
-    
-    _mappedData = [NSData dou_modifiableDataWithMappedContentsOfFile:_cachedPath];
-    self.cacheInfo.expectedLength = (NSInteger)_expectedLength;
-    self.cacheInfo.cacheWriteTmpPath = _cachedPath;
-    self.cacheInfo.audioFileURL = _audioFileURL.absoluteString;
+        [[NSFileHandle fileHandleForWritingAtPath:_cachedPath] truncateFileAtOffset:_expectedLength];
+        
+        _mimeType = [[_request responseHeaders] objectForKey:@"Content-Type"];
+        
+        _mappedData = [NSData dou_modifiableDataWithMappedContentsOfFile:_cachedPath];
+        self.cacheInfo.expectedLength = (NSInteger)_expectedLength;
+        self.cacheInfo.cacheWriteTmpPath = _cachedPath;
+        self.cacheInfo.audioFileURL = _audioFileURL.absoluteString;
     }
-    self.currentReceivedRange = NSMakeRange(_request.position, _request.position);
 }
 
 - (void)_requestDidReceiveData:(NSData *)data
@@ -176,62 +202,99 @@
     if (_mappedData == nil) {
         return;
     }
-    
+    pthread_mutex_lock(&_dataMutex);
     NSUInteger availableSpace = _expectedLength - _receivedLength - _request.position;
     NSUInteger bytesToWrite = MIN(availableSpace, [data length]);
-
+    
     memcpy((uint8_t *)[_mappedData bytes] + _receivedLength + _request.position, [data bytes], bytesToWrite);
     
     _receivedLength += bytesToWrite;
     
-    self.currentReceivedRange = NSMakeRange(_request.position,_receivedLength);
+    NSRange currentReceivedRange = NSMakeRange(_request.position,_receivedLength);
     
-    NSMutableDictionary* mutableCachedSegment = [self.cacheInfo.cachedSegment mutableCopy];
-    [mutableCachedSegment setObject:@(_receivedLength) forKey:@(self.currentReceivedRange.location)];
-    self.cacheInfo.cachedSegment = [mutableCachedSegment copy];
-    
+    [self.cacheInfo append:currentReceivedRange];
+    pthread_mutex_unlock(&_dataMutex);
     if (_sha256Ctx != NULL) {
         CC_SHA256_Update(_sha256Ctx, [data bytes], (CC_LONG)[data length]);
     }
     
-    if (!_readyToProducePackets && !_failed && !_requiresCompleteFile) {
-        OSStatus status = kAudioFileStreamError_UnsupportedFileType;
-        
-        if (_audioFileStreamID != NULL) {
-            status = AudioFileStreamParseBytes(_audioFileStreamID,
-                                               (UInt32)[data length],
-                                               [data bytes],
-                                               0);
-        }
-        
-        if (status != noErr && status != kAudioFileStreamError_NotOptimized) {
-            NSArray *fallbackTypeIDs = [self _fallbackTypeIDs];
-            for (NSNumber *typeIDNumber in fallbackTypeIDs) {
-                AudioFileTypeID typeID = (AudioFileTypeID)[typeIDNumber unsignedLongValue];
-                [self _closeAudioFileStream];
-                [self _openAudioFileStreamWithFileTypeHint:typeID];
-                
-                if (_audioFileStreamID != NULL) {
-                    status = AudioFileStreamParseBytes(_audioFileStreamID,
-                                                       (UInt32)_receivedLength,
-                                                       [_mappedData bytes],
-                                                       0);
-                    
-                    if (status == noErr || status == kAudioFileStreamError_NotOptimized) {
-                        break;
-                    }
-                }
+    if (!_readyToProducePackets && !_failed) {
+        if(!_requireAudioFileAPI) {
+            OSStatus status = kAudioFileStreamError_UnsupportedFileType;
+            
+            if (_audioFileStreamID != NULL) {
+                status = AudioFileStreamParseBytes(_audioFileStreamID,
+                                                   (UInt32)[data length],
+                                                   [data bytes],
+                                                   0);
             }
             
             if (status != noErr && status != kAudioFileStreamError_NotOptimized) {
-                _failed = YES;
+                NSArray *fallbackTypeIDs = [self _fallbackTypeIDs];
+                for (NSNumber *typeIDNumber in fallbackTypeIDs) {
+                    AudioFileTypeID typeID = (AudioFileTypeID)[typeIDNumber unsignedLongValue];
+                    [self _closeAudioFileStream];
+                    [self _openAudioFileStreamWithFileTypeHint:typeID];
+                    
+                    if (_audioFileStreamID != NULL) {
+                        status = AudioFileStreamParseBytes(_audioFileStreamID,
+                                                           (UInt32)_receivedLength,
+                                                           [_mappedData bytes],
+                                                           0);
+                        
+                        if (status == noErr || status == kAudioFileStreamError_NotOptimized) {
+                            break;
+                        }
+                    }
+                }
+                
+                if (status != noErr && status != kAudioFileStreamError_NotOptimized && status != kAudioFileStreamError_UnsupportedFileType) {
+                    _failed = YES;
+                }
+            }
+            
+            if (status == kAudioFileStreamError_NotOptimized || status == kAudioFileStreamError_UnsupportedFileType) {
+                [self _closeAudioFileStream];
+                _requireAudioFileAPI = YES;
             }
         }
-        
-        if (status == kAudioFileStreamError_NotOptimized) {
-            [self _closeAudioFileStream];
-            _requiresCompleteFile = YES;
+        else{
+            BOOL requringRangeFullfilled = YES;
+            for(NSArray<NSNumber *> * _Nonnull wrappedRange in _requringRanges) {
+                requringRangeFullfilled &= [self.cacheInfo rangeAvaible:NSMakeRange(wrappedRange.firstObject.unsignedIntegerValue, wrappedRange.lastObject.unsignedIntegerValue)];
+            };
+            if (requringRangeFullfilled ) {
+                _requringRanges = nil;
+                NSArray *fallbackTypeIDs = [self _fallbackTypeIDs];
+                for (NSNumber *typeIDNumber in fallbackTypeIDs) {
+                    AudioFileTypeID typeID = (AudioFileTypeID)[typeIDNumber unsignedLongValue];
+                    [self _openAudioFileWithFileTypeHint:typeID];
+                    
+                    if (_audioFileID != NULL) {
+                        _readyToProducePackets = YES;
+                        _requringRanges = nil;
+                        break;
+                    }
+                }
+                if (!_audioFileID ) {
+                    [self requesetNeededRange];
+                }
+            }
+            
         }
+    }
+    [self _invokeEventBlock];
+}
+
+- (void)requesetNeededRange
+{
+    if (_requringRanges.count) {
+        NSUInteger rangeMin = self.expectedLength;
+        for(NSArray<NSNumber *> * _Nonnull wrappedRange in _requringRanges) {
+            rangeMin = MIN(rangeMin, wrappedRange.firstObject.unsignedIntegerValue);
+        };
+        NSRange needRange = [self.cacheInfo nextNeedCacheRangeWithStartOffset:rangeMin];
+        [self requireOffset:(SInt64)needRange.location];
     }
 }
 
@@ -240,13 +303,14 @@
     [self _createRequest:0];
 }
 
-- (void)_createRequest:(NSUInteger)position
+- (void)_createRequest:(SInt64)position
 {
     _request = [DOUSimpleHTTPRequest requestWithURL:_audioFileURL];
-    _request.position = position;
-//    if (_expectedLength > 0) {
-//        _request.length = _expectedLength - _request.position;
-//    }
+    NSAssert(position <= _expectedLength, @"require position greater then expectedLength");
+    _request.position = (unsigned long long)position;
+    //    if (_expectedLength > 0) {
+    //        _request.length = _expectedLength - 1 - _request.position;
+    //    }
     _receivedLength = 0;
     if (_audioFileHost != nil) {
         [_request setHost:_audioFileHost];
@@ -404,50 +468,106 @@ static void audio_file_stream_packets_proc(void *inClientData,
     return _fileExtension;
 }
 
-- (NSUInteger)downloadSpeed
+
+static OSStatus audio_file_probe(void *inClientData,
+                                 SInt64 inPosition,
+                                 UInt32 requestCount,
+                                 void *buffer,
+                                 UInt32 *actualCount)
 {
-    return [_request downloadSpeed];
+    __unsafe_unretained _DOUAudioRemoteFileProvider *fileProvider = (__bridge _DOUAudioRemoteFileProvider *)inClientData;
+    
+    *actualCount = (UInt32)[fileProvider readIntoBuffer:buffer withRange:NSMakeRange((NSUInteger)inPosition, requestCount)];
+    if (*actualCount < requestCount){
+        //[fileProvider seekToOffset:inPosition + *actualCount];
+        NSArray<NSNumber *>* requireRange = @[@(inPosition), @(requestCount)];
+        [fileProvider.requringRanges addObject:requireRange];
+    }
+    return noErr;
+}
+
+static SInt64 audio_file_get_size(void *inClientData)
+{
+    __unsafe_unretained _DOUAudioRemoteFileProvider *fileProvider = (__bridge _DOUAudioRemoteFileProvider *)inClientData;
+    return (SInt64)[fileProvider expectedLength];
+}
+
+- (void)lockForRead
+{
+    pthread_mutex_lock(&_dataMutex);
+}
+- (void)unlockForRead
+{
+    pthread_mutex_unlock(&_dataMutex);
+}
+
+- (BOOL)rangeAvaiable:(NSRange)range
+{
+    return [self.cacheInfo rangeAvaible:range];
+}
+
+- (void)requireOffset:(SInt64)offset
+{
+    NSRange range = [self.cacheInfo nextNeedCacheRangeWithStartOffset:(NSUInteger)offset];
+    if (range.location == _request.position + _request.receivedLength) {
+        return;
+    }
+    [self cancelRequest];
+    [self _createRequest:offset];
+    [_request start];
+}
+
+- (NSUInteger)readIntoBuffer:(UInt8*)buffer withRange:(NSRange)range
+{
+    NSRange cachedRange = [self.cacheInfo cachedRangeWithOffset:range.location];
+    if(cachedRange.length > 0)
+    {
+        cachedRange.length = MIN(range.length, cachedRange.length);
+        [super readIntoBuffer:buffer withRange:cachedRange];
+    }
+    
+    return cachedRange.length;
+}
+
+- (BOOL)_openAudioFileWithFileTypeHint:(AudioFileTypeID)fileTypeHint
+{
+    
+    OSStatus status;
+    status = AudioFileOpenWithCallbacks((__bridge void *)self,
+                                        audio_file_probe,
+                                        NULL,
+                                        audio_file_get_size,
+                                        NULL,
+                                        fileTypeHint,
+                                        &_audioFileID);
+    if (status == noErr) {
+        _audioFileTypeID = fileTypeHint;
+    }
+    return status == noErr;
+}
+
+- (void)_closeAudioFile
+{
+    if (_audioFileID != NULL) {
+        AudioFileClose(_audioFileID);
+        _audioFileID = NULL;
+    }
 }
 
 - (BOOL)isReady
 {
-    if (!_requiresCompleteFile) {
-        return _readyToProducePackets;
-    }
-    
-    return [self isFinished];
+    return _readyToProducePackets;
 }
 
-- (void)handleSeekTo:(unsigned long long)offset
-{
-    if ([self.cacheInfo isCachedPosition:offset]) {
-        [self _invokeEventBlock];
-        return;
-    }
-    else if(_request.position != offset){
-        [_request setCompletedBlock:NULL];
-        [_request setProgressBlock:NULL];
-        [_request setDidReceiveResponseBlock:NULL];
-        [_request setDidReceiveDataBlock:NULL];
-        
-        [_request cancel];
-        
-        [self _createRequest:offset];
-        [_request start];
-    }
-    else{
-        
-    }
-}
 
-- (NSUInteger)receivedLength
+- (unsigned long long)receivedLength
 {
-    return NSMaxRange(self.currentReceivedRange);
+    return self.expectedLength;
 }
 
 - (double)bufferingRatio
 {
-    return (double)NSMaxRange(self.currentReceivedRange) / [self expectedLength];
+    return 0.0f / [self expectedLength];
 }
 
 - (BOOL)isFinished
@@ -461,6 +581,19 @@ static void audio_file_stream_packets_proc(void *inClientData,
         _cacheInfo = [[DOUCacheInfo alloc] init];
     }
     return _cacheInfo;
+}
+
+- (NSMutableArray<NSArray<NSNumber *>*> *)requringRanges
+{
+    if (nil == _requringRanges) {
+        _requringRanges = [NSMutableArray array];
+    }
+    return _requringRanges;
+}
+
+- (void)setRequireRanges:(NSMutableArray *)ranges
+{
+    _requringRanges = ranges;
 }
 @end
 

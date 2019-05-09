@@ -8,6 +8,7 @@
 
 #import <Foundation/Foundation.h>
 #import "DOUAudioFile.h"
+#import <AudioToolbox/AudioToolbox.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -16,22 +17,19 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSString* audioFileURL;
 @property (nonatomic, strong) NSString *cacheWritePath;
 @property (nonatomic, strong) NSString *cacheWriteTmpPath;
-@property (nonatomic, assign) NSInteger expectedLength;
-@property (nonatomic, strong) NSDictionary<NSNumber *,NSNumber *> *cachedSegment;
-@property (nonatomic, readonly) NSUInteger receivedLength;
-
+@property (nonatomic, assign) SInt64 expectedLength;
+@property (nonatomic, assign) BOOL supportSeek;
+@property (nonatomic, assign) AudioFileTypeID audioFileTypeHint;
 - (BOOL)isCacheCompleted;
 
-- (BOOL)isCachedPosition:(NSUInteger)pos;
+- (BOOL)rangeAvaible:(NSRange)queryRange;
 
-@end
+- (NSRange)cachedRangeWithOffset:(NSUInteger)startOffset;
 
+- (void)append:(NSRange)range;
 
-@interface DOUCacheManager : NSObject
+- (NSRange)nextNeedCacheRangeWithStartOffset:(NSUInteger)startOffset;
 
-+ (instancetype)defaultManager;
-
--(DOUCacheInfo *)cacheInfo:(NSURL *)url;
 @end
 
 NS_ASSUME_NONNULL_END

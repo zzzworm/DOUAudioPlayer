@@ -21,14 +21,13 @@
     NSString *_fileExtension;
     NSString *_sha256;
     NSData *_mappedData;
-    NSUInteger _expectedLength;
-    NSUInteger _receivedLength;
+    unsigned long long _expectedLength;
+    unsigned long long _receivedLength;
     BOOL _failed;
 }
 
 - (instancetype)_initWithAudioFile:(id <DOUAudioFile>)audioFile config:(DOUAudioStreamerConfig *)config;
 
-- (void)handleSeekTo:(unsigned long long)offset;
 @end
 
 #endif /* DOUAudioFileProvider_Private_h */

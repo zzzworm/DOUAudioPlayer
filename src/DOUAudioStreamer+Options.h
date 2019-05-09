@@ -25,5 +25,10 @@ DOUAS_EXTERN const NSUInteger kDOUAudioStreamerBufferTime;
 - (void)setOptions:(DOUAudioStreamerOptions)options;
 
 - (DOUAudioStreamerConfig *)config;
+- (void)setConfig:(DOUAudioStreamerConfig *)config;
+
+- (instancetype)initWithAudioFile:(id <DOUAudioFile>)audioFile config:(DOUAudioStreamerConfig *)config;
+
+
 
 @end

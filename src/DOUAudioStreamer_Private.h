@@ -22,6 +22,26 @@
 
 @interface DOUAudioStreamer ()
 {
+@private
+    id <DOUAudioFile> _audioFile;
+    
+    DOUAudioStreamerStatus _status;
+    NSError *_error;
+    
+    NSTimeInterval _duration;
+    NSInteger _timingOffset;
+    
+    DOUAudioFileProvider *_fileProvider;
+    DOUAudioPlaybackItem *_playbackItem;
+    DOUAudioDecoder *_decoder;
+    
+    
+    double _bufferingRatio;
+    
+#if TARGET_OS_IPHONE
+    BOOL _pausedByInterruption;
+#endif /* TARGET_OS_IPHONE */
+    
     DOUAudioStreamerConfig *_config;
 }
 

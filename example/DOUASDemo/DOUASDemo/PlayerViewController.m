@@ -49,7 +49,7 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
   NSTimer *_timer;
 
   DOUAudioPlayer *_player;
-  DOUAudioVisualizer *_audioVisualizer;
+  //DOUAudioVisualizer *_audioVisualizer;
 }
 @end
 
@@ -130,10 +130,10 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
     [_rateSlider addTarget:self action:@selector(_actionSliderRate:) forControlEvents:UIControlEventValueChanged];
     [view addSubview:_rateSlider];
 
-  _audioVisualizer = [[DOUAudioVisualizer alloc] initWithFrame:CGRectMake(0.0, CGRectGetMaxY([_rateSlider frame]), CGRectGetWidth([view bounds]), CGRectGetHeight([view bounds]) - CGRectGetMaxY([_rateSlider frame]))];
+  //_audioVisualizer = [[DOUAudioVisualizer alloc] initWithFrame:CGRectMake(0.0, CGRectGetMaxY([_rateSlider frame]), CGRectGetWidth([view bounds]), CGRectGetHeight([view bounds]) - CGRectGetMaxY([_rateSlider frame]))];
     
-  [_audioVisualizer setBackgroundColor:[UIColor colorWithRed:239.0 / 255.0 green:244.0 / 255.0 blue:240.0 / 255.0 alpha:1.0]];
-  [view addSubview:_audioVisualizer];
+  //[_audioVisualizer setBackgroundColor:[UIColor colorWithRed:239.0 / 255.0 green:244.0 / 255.0 blue:240.0 / 255.0 alpha:1.0]];
+  //[view addSubview:_audioVisualizer];
 
   [self setView:view];
 }
@@ -147,6 +147,30 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
 //    [_streamer removeObserver:self forKeyPath:@"bufferingRatio"];
 //    _streamer = nil;
 //  }
+}
+
+- (NSString *)defaultSoundCachePath
+{
+    //cache folder
+    NSString *path = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES).lastObject;
+    
+#if !TARGET_OS_IPHONE
+    
+    //append application bundle ID on Mac OS
+    NSString *identifier = [[NSBundle mainBundle] objectForInfoDictionaryKey:(NSString *)kCFBundleIdentifierKey];
+    path = [path stringByAppendingPathComponent:identifier];
+    
+#endif
+    path = [path stringByAppendingPathComponent:@"SoundCache"];
+    //create the folder if it doesn't exist
+    if (![[NSFileManager defaultManager] fileExistsAtPath:path])
+    {
+        [[NSFileManager defaultManager] createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:NULL];
+    }
+    
+    //retain path
+    path = [[NSString alloc] initWithString:path];
+    return path;
 }
 
 - (void)_resetStreamer
@@ -168,7 +192,7 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
             [_player addObserver:self forKeyPath:@"status" options:NSKeyValueObservingOptionNew context:kStatusKVOKey];
             [_player addObserver:self forKeyPath:@"duration" options:NSKeyValueObservingOptionNew context:kDurationKVOKey];
             [_player addObserver:self forKeyPath:@"bufferingRatio" options:NSKeyValueObservingOptionNew context:kBufferingRatioKVOKey];
-            _audioVisualizer.player = _player;
+            //_audioVisualizer.player = _player;
         }
         [_player setAudioFile:track];
         [_player play];
@@ -234,7 +258,7 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
 
 - (void)_updateBufferingStatus
 {
-  [_miscLabel setText:[NSString stringWithFormat:@"Received %.2f/%.2f MB (%.2f %%), Speed %.2f MB/s", (double)[_player.streamer receivedLength] / 1024 / 1024, (double)[_player.streamer expectedLength] / 1024 / 1024, [_player.streamer bufferingRatio] * 100.0, (double)[_player.streamer downloadSpeed] / 1024 / 1024]];
+  [_miscLabel setText:[NSString stringWithFormat:@"Received %.2f/%.2f MB (%.2f %%), Speed %.2f MB/s", (double)[_player.streamer receivedLength] / 1024 / 1024, (double)[_player.streamer expectedLength] / 1024 / 1024, [_player.streamer bufferingRatio] * 100.0, (double) 0 / 1024 / 1024]];
 
   if ([_player.streamer bufferingRatio] >= 1.0) {
     NSLog(@"sha256: %@", [_player.streamer sha256]);

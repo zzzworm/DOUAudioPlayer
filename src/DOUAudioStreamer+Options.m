@@ -17,10 +17,11 @@
 #import "DOUAudioStreamer+Options.h"
 #import "DOUAudioStreamer_Private.h"
 #include <CommonCrypto/CommonDigest.h>
+#import "DOUAudioFileProvider.h"
 #include <sys/xattr.h>
 
 NSString *const kDOUAudioStreamerVolumeKey = @"DOUAudioStreamerVolume";
-const NSUInteger kDOUAudioStreamerBufferTime = 200;
+const NSUInteger kDOUAudioStreamerBufferTime = 500;
 
 @implementation DOUAudioStreamerConfig
 
@@ -30,118 +31,6 @@ const NSUInteger kDOUAudioStreamerBufferTime = 200;
         
     }
     return self;
-}
-
-- (NSString *)offlinePath
-{
-    if (nil == _offlinePath) {
-        _offlinePath = [[DOUAudioStreamerConfig cacheDataPath] stringByAppendingPathComponent:@"DouCache"];
-    }
-    return _offlinePath;
-}
-
-- (NSString *)downloadedPath
-{
-    if (nil == _downloadedPath) {
-        _downloadedPath = [[DOUAudioStreamerConfig offlineDataPath] stringByAppendingPathComponent:@"DouDownload"];
-    }
-    return _downloadedPath;
-}
-
-+ (NSString *)cacheDataPath
-{
-    static NSString *path;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        
-        //cache folder
-        path = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES).lastObject;
-        
-#if !TARGET_OS_IPHONE
-        
-        //append application bundle ID on Mac OS
-        NSString *identifier = [[NSBundle mainBundle] objectForInfoDictionaryKey:(NSString *)kCFBundleIdentifierKey];
-        path = [path stringByAppendingPathComponent:identifier];
-        
-#endif
-        
-        //create the folder if it doesn't exist
-        if (![[NSFileManager defaultManager] fileExistsAtPath:path])
-        {
-            [[NSFileManager defaultManager] createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:NULL];
-        }
-        
-        //retain path
-        path = [[NSString alloc] initWithString:path];
-    });
-    
-    return path;
-}
-
-+ (NSString *)privateDataPath
-{
-    static NSString *path;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        
-        //application support folder
-        path = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES).lastObject;
-        
-#if !TARGET_OS_IPHONE
-        
-        //append application name on Mac OS
-        NSString *identifier = [[NSBundle mainBundle] objectForInfoDictionaryKey:(NSString *)kCFBundleNameKey];
-        path = [path stringByAppendingPathComponent:identifier];
-        
-#endif
-        
-        //create the folder if it doesn't exist
-        if (![[NSFileManager defaultManager] fileExistsAtPath:path])
-        {
-            [[NSFileManager defaultManager] createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:NULL];
-        }
-        
-        //retain path
-        path = [[NSString alloc] initWithString:path];
-    });
-    
-    return path;
-}
-
-
-+ (NSString *)offlineDataPath
-{
-    static NSString *path;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        
-        //offline data folder
-        path = [self.privateDataPath stringByAppendingPathComponent:@"Offline Data"];
-        
-        //create the folder if it doesn't exist
-        if (![[NSFileManager defaultManager] fileExistsAtPath:path])
-        {
-            [[NSFileManager defaultManager] createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:NULL];
-        }
-        
-        if (&NSURLIsExcludedFromBackupKey && [NSURL instancesRespondToSelector:@selector(setResourceValue:forKey:error:)])
-        {
-            //use iOS 5.1 method to exclude file from backup
-            NSURL *URL = [NSURL fileURLWithPath:path isDirectory:YES];
-            [URL setResourceValue:@YES forKey:NSURLIsExcludedFromBackupKey error:NULL];
-        }
-        else
-        {
-            //use the iOS 5.0.1 mobile backup flag to exclude file from backp
-            u_int8_t b = 1;
-            setxattr(path.fileSystemRepresentation, "com.apple.MobileBackup", &b, 1, 0, 0);
-        }
-        
-        //retain path
-        path = [[NSString alloc] initWithString:path];
-    });
-    
-    return path;
 }
 
 @end
@@ -168,10 +57,35 @@ const NSUInteger kDOUAudioStreamerBufferTime = 200;
 {
     if (nil == _config) {
         _config = [[DOUAudioStreamerConfig alloc] init];
+        _config.metaDataPath = NSTemporaryDirectory();
+        _config.cachePath = NSTemporaryDirectory();
         _config.options = DOUAudioStreamerDefaultOptions;
     }
     return _config;
 }
 
+- (void)setConfig:(DOUAudioStreamerConfig *)config
+{
+    _config = config;
+}
+
+- (instancetype)initWithAudioFile:(id<DOUAudioFile>)audioFile config:(DOUAudioStreamerConfig *)config
+{
+    self = [super init];
+    if (self) {
+        _audioFile = audioFile;
+        _status = DOUAudioStreamerIdle;
+        _config = config;
+        _fileProvider = [DOUAudioFileProvider fileProviderWithAudioFile:_audioFile config:self.config];
+        if (_fileProvider == nil) {
+            return nil;
+        }
+        
+        _bufferingRatio = (double)[_fileProvider receivedLength] / [_fileProvider expectedLength];
+        
+    }
+    
+    return self;
+}
 
 @end

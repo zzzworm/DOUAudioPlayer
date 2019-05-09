@@ -9,7 +9,7 @@
 #import "DOUAudioPlayer.h"
 #import "DOUAudioStreamer.h"
 #import "DOUAudioEventLoop.h"
-#import "DOUAudioStreamer_Private.h"
+#import "DOUAudioStreamer+Options.h"
 #import "DOUAudioFileProvider.h"
 
 static void *kStatusKVOKey = &kStatusKVOKey;
@@ -57,7 +57,7 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
 @private
     DOUAudioStreamer *_streamer;
     DOUAudioEventLoop *_eventLoop;
-
+    DOUAudioStreamerConfig *_config;
 }
 
 @property (assign) DOUAudioStreamerStatus status;
@@ -79,6 +79,16 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
     if (self = [super init]) {
         _eventLoop = [[DOUAudioEventLoop alloc] init];
         _status = DOUAudioStreamerIdle;
+    }
+    return self;
+}
+
+- (instancetype)initWithConfig:(DOUAudioStreamerConfig *)config
+{
+    if (self = [super init]) {
+        _eventLoop = [[DOUAudioEventLoop alloc] init];
+        _status = DOUAudioStreamerIdle;
+        _config = config;
     }
     return self;
 }
@@ -110,6 +120,7 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
         _streamer = nil;
     }
     _streamer = [DOUAudioStreamer streamerWithAudioFile:audioFile];
+    _streamer.config = _config;
     [_streamer addObserver:self forKeyPath:@"status" options:NSKeyValueObservingOptionNew context:kStatusKVOKey];
     [_streamer addObserver:self forKeyPath:@"duration" options:NSKeyValueObservingOptionNew context:kDurationKVOKey];
     [_streamer addObserver:self forKeyPath:@"bufferingRatio" options:NSKeyValueObservingOptionNew context:kBufferingRatioKVOKey];

@@ -18,8 +18,8 @@
 #import "DOUSimpleHTTPRequest.h"
 #import "NSData+DOUMappedFile.h"
 #include <CommonCrypto/CommonDigest.h>
-#include <AudioToolbox/AudioToolbox.h>
 #import "DOUAudioRemoteFileProvider.h"
+#import "DOUAudioLocalFileProvider.h"
 #import "DOUAudioFileProvider_Private.h"
 
 #if TARGET_OS_IPHONE
@@ -32,102 +32,17 @@
 #import "DOUMPMediaLibraryAssetLoader.h"
 #endif /* TARGET_OS_IPHONE */
 
-@interface _DOUAudioLocalFileProvider : DOUAudioFileProvider
-@end
+
 
 #if TARGET_OS_IPHONE
 @interface _DOUAudioMediaLibraryFileProvider : DOUAudioFileProvider {
 @private
-  DOUMPMediaLibraryAssetLoader *_assetLoader;
-  BOOL _loaderCompleted;
+    DOUMPMediaLibraryAssetLoader *_assetLoader;
+    BOOL _loaderCompleted;
 }
 @end
 #endif /* TARGET_OS_IPHONE */
 
-#pragma mark - Concrete Audio Local File Provider
-
-@implementation _DOUAudioLocalFileProvider
-
-- (instancetype)_initWithAudioFile:(id <DOUAudioFile>)audioFile config:(DOUAudioStreamerConfig *)config
-{
-  self = [super _initWithAudioFile:audioFile config:config];
-  if (self) {
-    _cachedURL = [audioFile audioFileURL];
-    _cachedPath = [_cachedURL path];
-
-    BOOL isDirectory = NO;
-    if (![[NSFileManager defaultManager] fileExistsAtPath:_cachedPath
-                                              isDirectory:&isDirectory] ||
-        isDirectory) {
-      return nil;
-    }
-
-    _mappedData = [NSData dou_dataWithMappedContentsOfFile:_cachedPath];
-    _expectedLength = [_mappedData length];
-    _receivedLength = [_mappedData length];
-  }
-
-  return self;
-}
-
-- (NSString *)mimeType
-{
-  if (_mimeType == nil &&
-      [self fileExtension] != nil) {
-    CFStringRef uti = UTTypeCreatePreferredIdentifierForTag(kUTTagClassFilenameExtension, (__bridge CFStringRef)[self fileExtension], NULL);
-    if (uti != NULL) {
-      _mimeType = CFBridgingRelease(UTTypeCopyPreferredTagWithClass(uti, kUTTagClassMIMEType));
-      CFRelease(uti);
-    }
-  }
-
-  return _mimeType;
-}
-
-- (NSString *)fileExtension
-{
-  if (_fileExtension == nil) {
-    _fileExtension = [[[self audioFile] audioFileURL] pathExtension];
-  }
-
-  return _fileExtension;
-}
-
-- (NSString *)sha256
-{
-  if (_sha256 == nil &&
-      self.config.options & DOUAudioStreamerRequireSHA256 &&
-      [self mappedData] != nil) {
-    unsigned char hash[CC_SHA256_DIGEST_LENGTH];
-    CC_SHA256([[self mappedData] bytes], (CC_LONG)[[self mappedData] length], hash);
-
-    NSMutableString *result = [NSMutableString stringWithCapacity:CC_SHA256_DIGEST_LENGTH * 2];
-    for (size_t i = 0; i < CC_SHA256_DIGEST_LENGTH; ++i) {
-      [result appendFormat:@"%02x", hash[i]];
-    }
-
-    _sha256 = [result copy];
-  }
-
-  return _sha256;
-}
-
-- (NSUInteger)downloadSpeed
-{
-  return _receivedLength;
-}
-
-- (BOOL)isReady
-{
-  return YES;
-}
-
-- (BOOL)isFinished
-{
-  return YES;
-}
-
-@end
 
 #pragma mark - Concrete Audio Media Library File Provider
 
@@ -136,98 +51,98 @@
 
 - (instancetype)_initWithAudioFile:(id <DOUAudioFile>)audioFile config:(DOUAudioStreamerConfig *)config
 {
-  self = [super _initWithAudioFile:audioFile config:config];
-  if (self) {
-    [self _createAssetLoader];
-    [_assetLoader start];
-  }
-
-  return self;
+    self = [super _initWithAudioFile:audioFile config:config];
+    if (self) {
+        [self _createAssetLoader];
+        [_assetLoader start];
+    }
+    
+    return self;
 }
 
 - (void)dealloc
 {
-  @synchronized(_assetLoader) {
-    [_assetLoader setCompletedBlock:NULL];
-    [_assetLoader cancel];
-  }
-
-  [[NSFileManager defaultManager] removeItemAtPath:[_assetLoader cachedPath]
-                                             error:NULL];
+    @synchronized(_assetLoader) {
+        [_assetLoader setCompletedBlock:NULL];
+        [_assetLoader cancel];
+    }
+    
+    [[NSFileManager defaultManager] removeItemAtPath:[_assetLoader cachedPath]
+                                               error:NULL];
 }
 
 - (void)_invokeEventBlock
 {
-  if (_eventBlock != NULL) {
-    _eventBlock();
-  }
+    if (_eventBlock != NULL) {
+        _eventBlock();
+    }
 }
 
 - (void)_assetLoaderDidComplete
 {
-  if ([_assetLoader isFailed]) {
-    _failed = YES;
+    if ([_assetLoader isFailed]) {
+        _failed = YES;
+        [self _invokeEventBlock];
+        return;
+    }
+    
+    _mimeType = [_assetLoader mimeType];
+    _fileExtension = [_assetLoader fileExtension];
+    
+    _cachedPath = [_assetLoader cachedPath];
+    _cachedURL = [NSURL fileURLWithPath:_cachedPath];
+    
+    _mappedData = [NSData dou_dataWithMappedContentsOfFile:_cachedPath];
+    _expectedLength = [_mappedData length];
+    _receivedLength = [_mappedData length];
+    
+    _loaderCompleted = YES;
     [self _invokeEventBlock];
-    return;
-  }
-
-  _mimeType = [_assetLoader mimeType];
-  _fileExtension = [_assetLoader fileExtension];
-
-  _cachedPath = [_assetLoader cachedPath];
-  _cachedURL = [NSURL fileURLWithPath:_cachedPath];
-
-  _mappedData = [NSData dou_dataWithMappedContentsOfFile:_cachedPath];
-  _expectedLength = [_mappedData length];
-  _receivedLength = [_mappedData length];
-
-  _loaderCompleted = YES;
-  [self _invokeEventBlock];
 }
 
 - (void)_createAssetLoader
 {
-  _assetLoader = [DOUMPMediaLibraryAssetLoader loaderWithURL:[_audioFile audioFileURL]];
-
-  __weak typeof(self) weakSelf = self;
-  [_assetLoader setCompletedBlock:^{
-    __strong typeof(weakSelf) strongSelf = weakSelf;
-    [strongSelf _assetLoaderDidComplete];
-  }];
+    _assetLoader = [DOUMPMediaLibraryAssetLoader loaderWithURL:[_audioFile audioFileURL]];
+    
+    __weak typeof(self) weakSelf = self;
+    [_assetLoader setCompletedBlock:^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        [strongSelf _assetLoaderDidComplete];
+    }];
 }
 
 - (NSString *)sha256
 {
-  if (_sha256 == nil &&
-      self.config.options & DOUAudioStreamerRequireSHA256 &&
-      [self mappedData] != nil) {
-    unsigned char hash[CC_SHA256_DIGEST_LENGTH];
-    CC_SHA256([[self mappedData] bytes], (CC_LONG)[[self mappedData] length], hash);
-
-    NSMutableString *result = [NSMutableString stringWithCapacity:CC_SHA256_DIGEST_LENGTH * 2];
-    for (size_t i = 0; i < CC_SHA256_DIGEST_LENGTH; ++i) {
-      [result appendFormat:@"%02x", hash[i]];
+    if (_sha256 == nil &&
+        self.config.options & DOUAudioStreamerRequireSHA256 &&
+        [self mappedData] != nil) {
+        unsigned char hash[CC_SHA256_DIGEST_LENGTH];
+        CC_SHA256([[self mappedData] bytes], (CC_LONG)[[self mappedData] length], hash);
+        
+        NSMutableString *result = [NSMutableString stringWithCapacity:CC_SHA256_DIGEST_LENGTH * 2];
+        for (size_t i = 0; i < CC_SHA256_DIGEST_LENGTH; ++i) {
+            [result appendFormat:@"%02x", hash[i]];
+        }
+        
+        _sha256 = [result copy];
     }
-
-    _sha256 = [result copy];
-  }
-
-  return _sha256;
-}
-
-- (NSUInteger)downloadSpeed
-{
-  return _receivedLength;
+    
+    return _sha256;
 }
 
 - (BOOL)isReady
 {
-  return _loaderCompleted;
+    return _loaderCompleted;
 }
 
 - (BOOL)isFinished
 {
-  return _loaderCompleted;
+    return _loaderCompleted;
+}
+
+- (BOOL)rangeAvaiable:(NSRange)range
+{
+    return range.location >= 0 && NSMaxRange(range) < self.expectedLength;
 }
 
 @end
@@ -254,109 +169,87 @@
 
 + (instancetype)_fileProviderWithAudioFile:(id <DOUAudioFile>)audioFile config:(DOUAudioStreamerConfig *)config
 {
-  if (audioFile == nil) {
-    return nil;
-  }
-
-  NSURL *audioFileURL = [audioFile audioFileURL];
-  if (audioFileURL == nil) {
-    return nil;
-  }
-
-  if ([audioFileURL isFileURL]) {
-    return [[_DOUAudioLocalFileProvider alloc] _initWithAudioFile:audioFile config:config];
-  }
+    if (audioFile == nil) {
+        return nil;
+    }
+    
+    NSURL *audioFileURL = [audioFile audioFileURL];
+    if (audioFileURL == nil) {
+        return nil;
+    }
+    
+    if ([audioFileURL isFileURL]) {
+        return [[_DOUAudioLocalFileProvider alloc] _initWithAudioFile:audioFile config:config];
+    }
 #if TARGET_OS_IPHONE
-  else if ([[audioFileURL scheme] isEqualToString:@"ipod-library"]) {
-    return [[_DOUAudioMediaLibraryFileProvider alloc] _initWithAudioFile:audioFile config:config];
-  }
+    else if ([[audioFileURL scheme] isEqualToString:@"ipod-library"]) {
+        return [[_DOUAudioMediaLibraryFileProvider alloc] _initWithAudioFile:audioFile config:config];
+    }
 #endif /* TARGET_OS_IPHONE */
-  else {
-    return [[_DOUAudioRemoteFileProvider alloc] _initWithAudioFile:audioFile config:config];
-  }
+    else {
+        return [[_DOUAudioRemoteFileProvider alloc] _initWithAudioFile:audioFile config:config];
+    }
 }
 
 + (instancetype)fileProviderWithAudioFile:(id <DOUAudioFile>)audioFile config:(DOUAudioStreamerConfig *)config
 {
-
-  return [self _fileProviderWithAudioFile:audioFile config:config];
+    
+    return [self _fileProviderWithAudioFile:audioFile config:config];
 }
 
 - (void)setHintWithAudioFile:(id <DOUAudioFile>)audioFile
 {
-  if (audioFile == _hintFile ||
-      [audioFile isEqual:_hintFile]) {
-    return;
-  }
-
-  _hintFile = nil;
-  _hintProvider = nil;
-
-  if (audioFile == nil) {
-    return;
-  }
-
-  NSURL *audioFileURL = [audioFile audioFileURL];
-  if (audioFileURL == nil ||
+    if (audioFile == _hintFile ||
+        [audioFile isEqual:_hintFile]) {
+        return;
+    }
+    
+    _hintFile = nil;
+    _hintProvider = nil;
+    
+    if (audioFile == nil) {
+        return;
+    }
+    
+    NSURL *audioFileURL = [audioFile audioFileURL];
+    if (audioFileURL == nil ||
 #if TARGET_OS_IPHONE
-      [[audioFileURL scheme] isEqualToString:@"ipod-library"] ||
+        [[audioFileURL scheme] isEqualToString:@"ipod-library"] ||
 #endif /* TARGET_OS_IPHONE */
-      [audioFileURL isFileURL]) {
-    return;
-  }
-
-  _hintFile = audioFile;
-
-  if (_lastProviderIsFinished) {
-    _hintProvider = [self.class _fileProviderWithAudioFile:_hintFile config:self.config];
-  }
+        [audioFileURL isFileURL]) {
+        return;
+    }
+    
+    _hintFile = audioFile;
+    
+    if (_lastProviderIsFinished) {
+        _hintProvider = [self.class _fileProviderWithAudioFile:_hintFile config:self.config];
+    }
 }
 
 - (instancetype)_initWithAudioFile:(id <DOUAudioFile>)audioFile config:(DOUAudioStreamerConfig *)config
 {
-  self = [super init];
-  if (self) {
-    _audioFile = audioFile;
-      _config = config;
-  }
-
-  return self;
-}
-
-- (NSUInteger)downloadSpeed
-{
-  [self doesNotRecognizeSelector:_cmd];
-  return 0;
+    self = [super init];
+    if (self) {
+        _audioFile = audioFile;
+        _config = config;
+    }
+    
+    return self;
 }
 
 - (BOOL)isReady
 {
-  [self doesNotRecognizeSelector:_cmd];
-  return NO;
+    [self doesNotRecognizeSelector:_cmd];
+    return NO;
 }
 
 - (BOOL)isFinished
 {
-  [self doesNotRecognizeSelector:_cmd];
-  return NO;
+    [self doesNotRecognizeSelector:_cmd];
+    return NO;
 }
 
-
-- (void)seekTo:(unsigned long long)packetDataOffset
-{
-    if (self.isFinished) {
-        if (_eventBlock != NULL) {
-            _eventBlock();
-        }
-        return;
-    }
-    [self handleSeekTo:packetDataOffset];
-}
-
-- (void)handleSeekTo:(unsigned long long)offset
-{
-    
-}
 
 - (double)bufferingRatio
 {
@@ -366,5 +259,40 @@
 - (void)dealloc
 {
     self.eventBlock = nil;
+}
+
+- (BOOL)rangeAvaiable:(NSRange)range
+{
+    return NO;
+}
+
+- (NSUInteger)readIntoBuffer:(UInt8*)buffer withRange:(NSRange)range
+{
+    NSUInteger actualCount = 0;
+    NSUInteger inPosition = range.location;
+    NSUInteger requestCount = range.length;
+    if (inPosition + requestCount > [[self mappedData] length]) {
+        if (inPosition >= [[self mappedData] length]) {
+            actualCount = 0;
+        }
+        else {
+            actualCount = (UInt32)([[self mappedData] length] - inPosition);
+        }
+    }
+    else {
+        actualCount = requestCount;
+    }
+    memcpy(buffer, (uint8_t *)[[self mappedData] bytes] + inPosition, actualCount);
+
+    return actualCount;
+}
+
+- (void)lockForRead
+{
+    
+}
+- (void)unlockForRead
+{
+    
 }
 @end

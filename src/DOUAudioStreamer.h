@@ -23,12 +23,12 @@
 DOUAS_EXTERN NSString *const kDOUAudioStreamerErrorDomain;
 
 typedef NS_ENUM(NSUInteger, DOUAudioStreamerStatus) {
-  DOUAudioStreamerPlaying,
-  DOUAudioStreamerPaused,
-  DOUAudioStreamerIdle,
-  DOUAudioStreamerFinished,
-  DOUAudioStreamerBuffering,
-  DOUAudioStreamerError
+    DOUAudioStreamerIdle,
+    DOUAudioStreamerPlaying,
+    DOUAudioStreamerPaused,
+    DOUAudioStreamerFinished,
+    DOUAudioStreamerBuffering,
+    DOUAudioStreamerError
 };
 
 typedef NS_ENUM(NSInteger, DOUAudioStreamerErrorCode) {
@@ -47,7 +47,7 @@ typedef NS_OPTIONS(NSUInteger, DOUAudioStreamerOptions) {
 
 @interface DOUAudioStreamerConfig : NSObject
 
-@property (nonatomic, strong) NSString* offlinePath;
+@property (nonatomic, strong) NSString* cachePath;
 @property (nonatomic, strong) NSString* downloadedPath;
 @property (nonatomic, strong) NSString* metaDataPath;
 
@@ -76,7 +76,6 @@ typedef NS_OPTIONS(NSUInteger, DOUAudioStreamerOptions) {
 
 @property (nonatomic, readonly) NSUInteger expectedLength;
 @property (nonatomic, readonly) NSUInteger receivedLength;
-@property (nonatomic, readonly) NSUInteger downloadSpeed;
 @property (nonatomic, assign, readonly) double bufferingRatio;
 
 

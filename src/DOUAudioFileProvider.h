@@ -17,6 +17,7 @@
 #import <Foundation/Foundation.h>
 #import "DOUAudioFile.h"
 #import "DOUAudioStreamer.h"
+#include <AudioToolbox/AudioToolbox.h>
 
 @class DOUAudioFileProvider;
 
@@ -40,9 +41,8 @@ extern DOUAudioFileProvider *gHintProvider;
 
 @property (nonatomic, readonly) NSData *mappedData;
 
-@property (nonatomic, readonly) NSUInteger expectedLength;
-@property (nonatomic, readonly) NSUInteger receivedLength;
-@property (nonatomic, readonly) NSUInteger downloadSpeed;
+@property (nonatomic, readonly) unsigned long long expectedLength;
+@property (nonatomic, readonly) unsigned long long receivedLength;
 
 @property (nonatomic, readonly, getter=isFailed) BOOL failed;
 @property (nonatomic, readonly, getter=isReady) BOOL ready;
@@ -55,6 +55,15 @@ extern DOUAudioFileProvider *gHintProvider;
 @property (nonatomic, assign) BOOL lastProviderIsFinished;
 @property (nonatomic, assign, readonly) double bufferingRatio;
 
-- (void)seekTo:(unsigned long long)packetDataOffset;
+- (BOOL)rangeAvaiable:(NSRange)range;
+
+- (NSUInteger)readIntoBuffer:(UInt8*)buffer withRange:(NSRange)range;
+
+- (void)_closeAudioFile;
+
+- (BOOL)_openAudioFileWithFileTypeHint:(AudioFileTypeID)fileTypeHint;
+
+- (void)lockForRead;
+- (void)unlockForRead;
 
 @end

@@ -8,7 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		5F7CF3B4216B59C200498518 /* AUiPodTimeProxy.m in Sources */ = {isa = PBXBuildFile; fileRef = 5F7CF3B2216B59C100498518 /* AUiPodTimeProxy.m */; };
-		5F7CF3B6216B65F200498518 /* sample.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5F7CF3B5216B65F200498518 /* sample.mp3 */; };
+		5FD3A2D4227EF26A006F9B9A /* DOUAudioLocalFileProvider.m in Sources */ = {isa = PBXBuildFile; fileRef = 5FD3A2D3227EF26A006F9B9A /* DOUAudioLocalFileProvider.m */; };
+		5FD3A2D6228027D8006F9B9A /* sample.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 5FD3A2D5228027D8006F9B9A /* sample.m4a */; };
 		5FECCF7A216F95A80019FAFB /* DOUCacheInfo.m in Sources */ = {isa = PBXBuildFile; fileRef = 5FECCF79216F95A80019FAFB /* DOUCacheInfo.m */; };
 		5FECCF7D216F9E710019FAFB /* DOUAudioRemoteFileProvider.m in Sources */ = {isa = PBXBuildFile; fileRef = 5FECCF7C216F9E710019FAFB /* DOUAudioRemoteFileProvider.m */; };
 		5FECCF8121707A880019FAFB /* DOUAudioPlayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 5FECCF8021707A880019FAFB /* DOUAudioPlayer.m */; };
@@ -57,7 +58,9 @@
 /* Begin PBXFileReference section */
 		5F7CF3B2216B59C100498518 /* AUiPodTimeProxy.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AUiPodTimeProxy.m; sourceTree = "<group>"; };
 		5F7CF3B3216B59C100498518 /* AUiPodTimeProxy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AUiPodTimeProxy.h; sourceTree = "<group>"; };
-		5F7CF3B5216B65F200498518 /* sample.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = sample.mp3; sourceTree = "<group>"; };
+		5FD3A2D2227EF26A006F9B9A /* DOUAudioLocalFileProvider.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOUAudioLocalFileProvider.h; sourceTree = "<group>"; };
+		5FD3A2D3227EF26A006F9B9A /* DOUAudioLocalFileProvider.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DOUAudioLocalFileProvider.m; sourceTree = "<group>"; };
+		5FD3A2D5228027D8006F9B9A /* sample.m4a */ = {isa = PBXFileReference; lastKnownFileType = file; path = sample.m4a; sourceTree = "<group>"; };
 		5FECCF78216F95A80019FAFB /* DOUCacheInfo.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOUCacheInfo.h; sourceTree = "<group>"; };
 		5FECCF79216F95A80019FAFB /* DOUCacheInfo.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DOUCacheInfo.m; sourceTree = "<group>"; };
 		5FECCF7B216F9E710019FAFB /* DOUAudioRemoteFileProvider.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOUAudioRemoteFileProvider.h; sourceTree = "<group>"; };
@@ -109,7 +112,7 @@
 		D47CA3A417680AF1002D73B4 /* DOUAudioFrequencyAnalyzer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DOUAudioFrequencyAnalyzer.m; sourceTree = "<group>"; };
 		D47CA3A517680AF1002D73B4 /* DOUAudioSpatialAnalyzer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DOUAudioSpatialAnalyzer.h; sourceTree = "<group>"; };
 		D47CA3A617680AF1002D73B4 /* DOUAudioSpatialAnalyzer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DOUAudioSpatialAnalyzer.m; sourceTree = "<group>"; };
-		D4C3891F171B9D87009D6124 /* DOUASDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DOUASDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D4C3891F171B9D87009D6124 /* DOUAudioPlayerDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DOUAudioPlayerDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D4C38922171B9D87009D6124 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		D4C38924171B9D87009D6124 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		D4C38926171B9D87009D6124 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
@@ -212,6 +215,8 @@
 				5FECCF7E21703A840019FAFB /* DOUAudioFileProvider_Private.h */,
 				5FECCF7F21707A880019FAFB /* DOUAudioPlayer.h */,
 				5FECCF8021707A880019FAFB /* DOUAudioPlayer.m */,
+				5FD3A2D2227EF26A006F9B9A /* DOUAudioLocalFileProvider.h */,
+				5FD3A2D3227EF26A006F9B9A /* DOUAudioLocalFileProvider.m */,
 			);
 			name = DOUAudioStreamer;
 			path = ../../../src;
@@ -229,7 +234,7 @@
 		D4C38920171B9D87009D6124 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				D4C3891F171B9D87009D6124 /* DOUASDemo.app */,
+				D4C3891F171B9D87009D6124 /* DOUAudioPlayerDemo.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -275,7 +280,7 @@
 		D4C38929171B9D87009D6124 /* Supporting Files */ = {
 			isa = PBXGroup;
 			children = (
-				5F7CF3B5216B65F200498518 /* sample.mp3 */,
+				5FD3A2D5228027D8006F9B9A /* sample.m4a */,
 				D4C3892A171B9D87009D6124 /* DOUASDemo-Info.plist */,
 				D4C3892B171B9D87009D6124 /* InfoPlist.strings */,
 				D4C3892E171B9D87009D6124 /* main.m */,
@@ -290,9 +295,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		D4C3891E171B9D87009D6124 /* DOUASDemo */ = {
+		D4C3891E171B9D87009D6124 /* DOUAudioPlayerDemo */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = D4C38942171B9D87009D6124 /* Build configuration list for PBXNativeTarget "DOUASDemo" */;
+			buildConfigurationList = D4C38942171B9D87009D6124 /* Build configuration list for PBXNativeTarget "DOUAudioPlayerDemo" */;
 			buildPhases = (
 				D4C3891B171B9D87009D6124 /* Sources */,
 				D4C3891C171B9D87009D6124 /* Frameworks */,
@@ -302,9 +307,9 @@
 			);
 			dependencies = (
 			);
-			name = DOUASDemo;
+			name = DOUAudioPlayerDemo;
 			productName = DOUASDemo;
-			productReference = D4C3891F171B9D87009D6124 /* DOUASDemo.app */;
+			productReference = D4C3891F171B9D87009D6124 /* DOUAudioPlayerDemo.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -326,6 +331,7 @@
 			developmentRegion = English;
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				English,
 				en,
 			);
 			mainGroup = D4C38916171B9D87009D6124;
@@ -333,7 +339,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				D4C3891E171B9D87009D6124 /* DOUASDemo */,
+				D4C3891E171B9D87009D6124 /* DOUAudioPlayerDemo */,
 			);
 		};
 /* End PBXProject section */
@@ -347,7 +353,7 @@
 				D4C38935171B9D87009D6124 /* Default.png in Resources */,
 				D4C38937171B9D87009D6124 /* Default@2x.png in Resources */,
 				D4C38939171B9D87009D6124 /* Default-568h@2x.png in Resources */,
-				5F7CF3B6216B65F200498518 /* sample.mp3 in Resources */,
+				5FD3A2D6228027D8006F9B9A /* sample.m4a in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -368,6 +374,7 @@
 				D47CA3A217680ADA002D73B4 /* DOUAudioAnalyzer.m in Sources */,
 				D4C38933171B9D87009D6124 /* AppDelegate.m in Sources */,
 				D43ACD8A1738B47B00E6A571 /* DOUAudioDecoder.m in Sources */,
+				5FD3A2D4227EF26A006F9B9A /* DOUAudioLocalFileProvider.m in Sources */,
 				D43AFF97176A938100D1FECF /* DOUAudioVisualizer.m in Sources */,
 				D43AFF99176A938100D1FECF /* DOUEAGLView.m in Sources */,
 				5FECCF7D216F9E710019FAFB /* DOUAudioRemoteFileProvider.m in Sources */,
@@ -475,7 +482,8 @@
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "DOUASDemo/DOUASDemo-Prefix.pch";
 				INFOPLIST_FILE = "DOUASDemo/DOUASDemo-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.douban.DOUAudioPlayerDemo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				WRAPPER_EXTENSION = app;
 			};
@@ -489,7 +497,8 @@
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "DOUASDemo/DOUASDemo-Prefix.pch";
 				INFOPLIST_FILE = "DOUASDemo/DOUASDemo-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.douban.DOUAudioPlayerDemo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				WRAPPER_EXTENSION = app;
 			};
@@ -507,7 +516,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		D4C38942171B9D87009D6124 /* Build configuration list for PBXNativeTarget "DOUASDemo" */ = {
+		D4C38942171B9D87009D6124 /* Build configuration list for PBXNativeTarget "DOUAudioPlayerDemo" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				D4C38943171B9D87009D6124 /* Debug */,

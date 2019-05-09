@@ -77,7 +77,7 @@
 - (void)setPlaybackRate:(Float32)value
 {
     // AUiPodTimeOther の場合
-    int parameter = 0;
+    AudioUnitParameterID parameter = 0;
     
     OSStatus ret = AudioUnitSetParameter(_aUiPodTimeUnit,
                                          parameter,
@@ -86,7 +86,7 @@
                                          value,
                                          0);
     if (ret != noErr) {
-        NSLog(@"Error setting parameter(%d)", parameter);
+        NSLog(@"Error setting parameter(%f)", value);
     }
 }
 

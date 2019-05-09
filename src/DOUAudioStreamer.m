@@ -22,29 +22,6 @@
 
 NSString *const kDOUAudioStreamerErrorDomain = @"com.douban.audio-streamer.error-domain";
 
-@interface DOUAudioStreamer () {
-@private
-  id <DOUAudioFile> _audioFile;
-
-  DOUAudioStreamerStatus _status;
-  NSError *_error;
-
-  NSTimeInterval _duration;
-  NSInteger _timingOffset;
-
-  DOUAudioFileProvider *_fileProvider;
-  DOUAudioPlaybackItem *_playbackItem;
-  DOUAudioDecoder *_decoder;
-    
-    
-  double _bufferingRatio;
-
-#if TARGET_OS_IPHONE
-  BOOL _pausedByInterruption;
-#endif /* TARGET_OS_IPHONE */
-}
-@end
-
 @implementation DOUAudioStreamer
 
 @synthesize status = _status;
@@ -127,9 +104,5 @@ NSString *const kDOUAudioStreamerErrorDomain = @"com.douban.audio-streamer.error
   return [_fileProvider receivedLength];
 }
 
-- (NSUInteger)downloadSpeed
-{
-  return [_fileProvider downloadSpeed];
-}
 
 @end
