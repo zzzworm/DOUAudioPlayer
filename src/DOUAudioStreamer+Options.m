@@ -80,8 +80,9 @@ const NSUInteger kDOUAudioStreamerBufferTime = 500;
         if (_fileProvider == nil) {
             return nil;
         }
-        
+        if([_fileProvider expectedLength] > 0){
         _bufferingRatio = (double)[_fileProvider receivedLength] / [_fileProvider expectedLength];
+        }
         
     }
     

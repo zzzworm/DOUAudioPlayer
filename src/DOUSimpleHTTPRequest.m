@@ -93,6 +93,7 @@ static CFRunLoopRef controller_get_runloop()
     NSInteger _statusCode;
     NSString *_statusMessage;
     BOOL _failed;
+    BOOL _supportsSeek;
     
     CFAbsoluteTime _startedTime;
     NSUInteger _downloadSpeed;
@@ -116,7 +117,7 @@ static CFRunLoopRef controller_get_runloop()
 
 @synthesize downloadSpeed = _downloadSpeed;
 @synthesize failed = _failed;
-
+@synthesize supportsSeek = _supportsSeek;
 @synthesize completedBlock = _completedBlock;
 @synthesize progressBlock = _progressBlock;
 @synthesize didReceiveResponseBlock = _didReceiveResponseBlock;
@@ -132,11 +133,19 @@ static CFRunLoopRef controller_get_runloop()
     return [[[self class] alloc] initWithURL:url];
 }
 
+- (NSString *)userAgent
+{
+    if (nil == _userAgent) {
+        _userAgent = [[self class] defaultUserAgent];
+    }
+    return _userAgent;
+}
+
 - (instancetype)initWithURL:(NSURL *)url
 {
     self = [super init];
     if (self) {
-        _userAgent = [[self class] defaultUserAgent];
+        
         _timeoutInterval = [[self class] defaultTimeoutInterval];
         _url = url;
         _message = CFHTTPMessageCreateRequest(kCFAllocatorDefault, CFSTR("GET"), (__bridge CFURLRef)url, kCFHTTPVersion1_1);
@@ -283,6 +292,16 @@ static CFRunLoopRef controller_get_runloop()
     _statusMessage = CFBridgingRelease(CFHTTPMessageCopyResponseStatusLine(message));
     CFRelease(message);
     
+    if (([_responseHeaders objectForKey:@"Accept-Ranges"] ?: [_responseHeaders objectForKey:@"accept-ranges"]) != nil)
+    {
+        _supportsSeek = ![[_responseHeaders objectForKey:@"Accept-Ranges"] isEqualToString:@"none"];
+    }
+    
+    if (([_responseHeaders objectForKey:@"Content-Range"] ?: [_responseHeaders objectForKey:@"content-range"]) != nil)
+    {
+        _supportsSeek = YES;
+    }
+    
     [self _checkResponseContentLength];
     [self _invokeDidReceiveResponseBlock];
 }
@@ -413,7 +432,7 @@ static void response_stream_client_callback(CFReadStreamRef stream, CFStreamEven
         return;
     }
     
-    CFHTTPMessageSetHeaderFieldValue(_message, CFSTR("User-Agent"), (__bridge CFStringRef)_userAgent);
+    CFHTTPMessageSetHeaderFieldValue(_message, CFSTR("User-Agent"), (__bridge CFStringRef)self.userAgent);
     if (_host != nil) {
         CFHTTPMessageSetHeaderFieldValue(_message, CFSTR("Host"), (__bridge CFStringRef)_host);
     }

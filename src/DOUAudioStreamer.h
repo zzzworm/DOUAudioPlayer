@@ -41,8 +41,7 @@ typedef NS_OPTIONS(NSUInteger, DOUAudioStreamerOptions) {
     DOUAudioStreamerRemoveCacheOnDeallocation = 1 << 1,
     DOUAudioStreamerRequireSHA256 = 1 << 2,
     
-    DOUAudioStreamerDefaultOptions = DOUAudioStreamerKeepPersistentVolume |
-    DOUAudioStreamerRemoveCacheOnDeallocation
+    DOUAudioStreamerDefaultOptions = DOUAudioStreamerKeepPersistentVolume
 };
 
 @interface DOUAudioStreamerConfig : NSObject
@@ -50,7 +49,7 @@ typedef NS_OPTIONS(NSUInteger, DOUAudioStreamerOptions) {
 @property (nonatomic, strong) NSString* cachePath;
 @property (nonatomic, strong) NSString* downloadedPath;
 @property (nonatomic, strong) NSString* metaDataPath;
-
+@property (nonatomic, copy) NSString *userAgent;
 @property (nonatomic, assign) DOUAudioStreamerOptions options;
 @end
 

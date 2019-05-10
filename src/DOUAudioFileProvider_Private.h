@@ -16,6 +16,7 @@
     id <DOUAudioFile> _audioFile;
     DOUAudioFileProviderEventBlock _eventBlock;
     NSString *_cachedPath;
+    NSString *_metaPath;
     NSURL *_cachedURL;
     NSString *_mimeType;
     NSString *_fileExtension;

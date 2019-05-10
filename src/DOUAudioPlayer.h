@@ -32,6 +32,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (assign, readonly) DOUAudioStreamerStatus status;
 
 
+- (instancetype)initWithConfig:(DOUAudioStreamerConfig *)config;
+
 - (DOUAudioStreamer *)streamer;
 
 - (void)play;

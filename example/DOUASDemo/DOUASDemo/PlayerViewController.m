@@ -19,6 +19,7 @@
 #import "DOUAudioPlayer.h"
 #import "DOUAudioVisualizer.h"
 #import "DOUAudioStreamer.h"
+#import <AVFoundation/AVFoundation.h>
 
 static void *kStatusKVOKey = &kStatusKVOKey;
 static void *kDurationKVOKey = &kDurationKVOKey;
@@ -173,6 +174,22 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
     return path;
 }
 
+- (void)ensureAudioSessionActive
+{
+    NSError *setCategoryErr = nil;
+    
+    AVAudioSessionCategoryOptions options = [UIApplication sharedApplication].applicationState == UIApplicationStateActive ? 0 : AVAudioSessionCategoryOptionMixWithOthers;
+    [[AVAudioSession sharedInstance] setCategory: AVAudioSessionCategoryPlayback withOptions:options error:&setCategoryErr];
+    
+    if (@available(iOS 9.0, *)) {
+        [[AVAudioSession sharedInstance] setMode:AVAudioSessionModeSpokenAudio error:nil];
+    } else {
+        [[AVAudioSession sharedInstance] setMode:AVAudioSessionModeDefault error:nil];
+    }
+    NSError *activationErr  = nil;
+    [[AVAudioSession sharedInstance] setActive:YES error:&activationErr];
+}
+
 - (void)_resetStreamer
 {
   
@@ -187,7 +204,11 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
         NSString *title = [NSString stringWithFormat:@"%@ - %@", track.artist, track.title];
         [_titleLabel setText:title];
         if (nil == _player) {
-            _player = [[DOUAudioPlayer alloc] init];
+            
+            [self ensureAudioSessionActive];
+            DOUAudioStreamerConfig *config = [[DOUAudioStreamerConfig alloc] init];
+            //config.userAgent = @"";
+            _player = [[DOUAudioPlayer alloc] initWithConfig:config];
 
             [_player addObserver:self forKeyPath:@"status" options:NSKeyValueObservingOptionNew context:kStatusKVOKey];
             [_player addObserver:self forKeyPath:@"duration" options:NSKeyValueObservingOptionNew context:kDurationKVOKey];
@@ -218,9 +239,9 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
     [_progressSlider setValue:0.0f animated:NO];
   }
   else {
-      _durationLabel.text = [NSString stringWithFormat:@"Duration:%.1f",[_player duration]];
     [_progressSlider setValue:[_player currentTime] / [_player duration] animated:YES];
   }
+    _durationLabel.text = [NSString stringWithFormat:@"Duration:%.1f",[_player duration]];
 }
 
 - (void)_updateStatus
@@ -349,4 +370,11 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
     _rateValLabel.text = [NSString stringWithFormat:@"%.2f",[_rateSlider value]];
 }
 
+- (void)dealloc
+{
+    [_player removeObserver:self forKeyPath:@"status"];
+    [_player removeObserver:self forKeyPath:@"duration"];
+    [_player removeObserver:self forKeyPath:@"bufferingRatio"];
+    
+}
 @end

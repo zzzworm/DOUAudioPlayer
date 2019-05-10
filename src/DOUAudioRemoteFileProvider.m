@@ -17,6 +17,8 @@
 #define BitRateEstimationMaxPackets 5000
 #define BitRateEstimationMinPackets 50
 
+#define HTTPRequestMaxLength (15 * 1024 *1024)
+
 #pragma mark - Concrete Audio Remote File Provider
 
 @interface _DOUAudioRemoteFileProvider()
@@ -39,20 +41,37 @@
         
         pthread_mutexattr_init(&attr);
         pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-        
         pthread_mutex_init(&_dataMutex, &attr);
-        [self _openAudioFileStream];
-        [self _createRequest];
-        [_request start];
+        
+        _metaPath = [self.class _metaPathForAudioFileURL:audioFile.audioFileURL];
+        _cacheInfo = [DOUCacheInfo cacheInfoWithFilePath:_metaPath];
+        _audioFileTypeID = _cacheInfo.audioFileTypeHint;
+        _expectedLength = _cacheInfo.expectedLength;
+        
+        if (_cacheInfo.audioFileTypeHint > 0) {
+            [self createMappedData];
+            if([self _openAudioFileWithFileTypeHint:_audioFileTypeID]){
+                _readyToProducePackets = YES;
+            }
+            else{
+                _cachedPath = nil;
+                _cachedURL = nil;
+                _metaPath = nil;
+                _mappedData = nil;
+                [[NSFileManager defaultManager] removeItemAtPath:_cachedPath error:NULL];
+                [[NSFileManager defaultManager] removeItemAtPath:_metaPath error:NULL];
+            }
+            
+        }
+        else{
+            [self _createRequest];
+            [_request start];
+        }
     }
     
     return self;
 }
 
-- (AudioFileStreamID)audioFileStreamID
-{
-    return _audioFileStreamID;
-}
 
 - (AudioFileID)audioFileID
 {
@@ -84,12 +103,11 @@
         free(_sha256Ctx);
     }
     
-    [self _closeAudioFileStream];
-    
     [self _closeAudioFile];
     
     if (self.config.options & DOUAudioStreamerRemoveCacheOnDeallocation) {
         [[NSFileManager defaultManager] removeItemAtPath:_cachedPath error:NULL];
+        [[NSFileManager defaultManager] removeItemAtPath:_metaPath error:NULL];
     }
 }
 
@@ -109,13 +127,13 @@
 
 + (NSString *)_cachedPathForAudioFileURL:(NSURL *)audioFileURL
 {
-    NSString *filename = [NSString stringWithFormat:@"douas-%@.tmp", [self _sha256ForAudioFileURL:audioFileURL]];
+    NSString *filename = [self _sha256ForAudioFileURL:audioFileURL];
     return [NSTemporaryDirectory() stringByAppendingPathComponent:filename];
 }
 
-+ (NSString *)_offlinePathForAudioFileURL:(NSURL *)audioFileURL
++ (NSString *)_metaPathForAudioFileURL:(NSURL *)audioFileURL
 {
-    NSString *filename = [NSString stringWithFormat:@"%@.tmp", [self _sha256ForAudioFileURL:audioFileURL]];
+    NSString *filename = [NSString stringWithFormat:@"%@.meta", [self _sha256ForAudioFileURL:audioFileURL]];
     return [NSTemporaryDirectory() stringByAppendingPathComponent:filename];
 }
 
@@ -138,7 +156,7 @@
         [_mappedData dou_synchronizeMappedFile];
         pthread_mutex_unlock(&_dataMutex);
     }
-    if (!_failed && _requireAudioFileAPI && !_audioFileID) {
+    if (!_failed && self.isFinished && !_audioFileID) {
         _failed = YES;
     }
     if (!_failed &&
@@ -158,7 +176,7 @@
         self.hintProvider == nil) {
         self.hintProvider = [[[self class] alloc] _initWithAudioFile:self.hintFile config:self.config];
     }
-    
+    [self.cacheInfo writeToFile:[self.class _metaPathForAudioFileURL:self.audioFile.audioFileURL]];
     [self _invokeEventBlock];
 }
 
@@ -177,22 +195,11 @@
     }
     if (nil == _cachedURL) {
         
-        _cachedPath = [[self class] _cachedPathForAudioFileURL:_audioFileURL];
-        _cachedURL = [NSURL fileURLWithPath:_cachedPath];
-        
-        [[NSFileManager defaultManager] createFileAtPath:_cachedPath contents:nil attributes:nil];
-#if TARGET_OS_IPHONE
-        [[NSFileManager defaultManager] setAttributes:@{NSFileProtectionKey: NSFileProtectionNone}
-                                         ofItemAtPath:_cachedPath
-                                                error:NULL];
-#endif /* TARGET_OS_IPHONE */
-        [[NSFileHandle fileHandleForWritingAtPath:_cachedPath] truncateFileAtOffset:_expectedLength];
+        [self createMappedData];
         
         _mimeType = [[_request responseHeaders] objectForKey:@"Content-Type"];
-        
-        _mappedData = [NSData dou_modifiableDataWithMappedContentsOfFile:_cachedPath];
-        self.cacheInfo.expectedLength = (NSInteger)_expectedLength;
-        self.cacheInfo.cacheWriteTmpPath = _cachedPath;
+        self.cacheInfo.expectedLength = _expectedLength;
+        self.cacheInfo.supportSeek = _request.supportsSeek;
         self.cacheInfo.audioFileURL = _audioFileURL.absoluteString;
     }
 }
@@ -219,71 +226,59 @@
     }
     
     if (!_readyToProducePackets && !_failed) {
-        if(!_requireAudioFileAPI) {
-            OSStatus status = kAudioFileStreamError_UnsupportedFileType;
+        [self tryOpenAudioFile];
+    }
+    if ([self requireRangeFullfilled]) {
+        _requringRanges = nil;
+        [self _invokeEventBlock];
+    }
+}
+
+- (void)createMappedData {
+    _cachedPath = [[self class] _cachedPathForAudioFileURL:_audioFileURL];
+    _cachedURL = [NSURL fileURLWithPath:_cachedPath];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:_cachedPath]) {
+        
+        [[NSFileManager defaultManager] createFileAtPath:_cachedPath contents:nil attributes:nil];
+#if TARGET_OS_IPHONE
+        [[NSFileManager defaultManager] setAttributes:@{NSFileProtectionKey: NSFileProtectionNone}
+                                         ofItemAtPath:_cachedPath
+                                                error:NULL];
+#endif /* TARGET_OS_IPHONE */
+        [[NSFileHandle fileHandleForWritingAtPath:_cachedPath] truncateFileAtOffset:_expectedLength];
+    }
+    _mappedData = [NSData dou_modifiableDataWithMappedContentsOfFile:_cachedPath];
+}
+
+
+- (BOOL)requireRangeFullfilled {
+    BOOL requringRangeFullfilled = YES;
+    for(NSArray<NSNumber *> * _Nonnull wrappedRange in _requringRanges) {
+        requringRangeFullfilled &= [self.cacheInfo rangeAvaible:NSMakeRange(wrappedRange.firstObject.unsignedIntegerValue, wrappedRange.lastObject.unsignedIntegerValue)];
+    }
+    return requringRangeFullfilled;
+}
+
+- (void)tryOpenAudioFile
+{
+    BOOL requringRangeFullfilled = [self requireRangeFullfilled];;
+    if (requringRangeFullfilled ) {
+        _requringRanges = nil;
+        NSArray *fallbackTypeIDs = [self _fallbackTypeIDs];
+        for (NSNumber *typeIDNumber in fallbackTypeIDs) {
+            AudioFileTypeID typeID = (AudioFileTypeID)[typeIDNumber unsignedLongValue];
+            [self _openAudioFileWithFileTypeHint:typeID];
             
-            if (_audioFileStreamID != NULL) {
-                status = AudioFileStreamParseBytes(_audioFileStreamID,
-                                                   (UInt32)[data length],
-                                                   [data bytes],
-                                                   0);
-            }
-            
-            if (status != noErr && status != kAudioFileStreamError_NotOptimized) {
-                NSArray *fallbackTypeIDs = [self _fallbackTypeIDs];
-                for (NSNumber *typeIDNumber in fallbackTypeIDs) {
-                    AudioFileTypeID typeID = (AudioFileTypeID)[typeIDNumber unsignedLongValue];
-                    [self _closeAudioFileStream];
-                    [self _openAudioFileStreamWithFileTypeHint:typeID];
-                    
-                    if (_audioFileStreamID != NULL) {
-                        status = AudioFileStreamParseBytes(_audioFileStreamID,
-                                                           (UInt32)_receivedLength,
-                                                           [_mappedData bytes],
-                                                           0);
-                        
-                        if (status == noErr || status == kAudioFileStreamError_NotOptimized) {
-                            break;
-                        }
-                    }
-                }
-                
-                if (status != noErr && status != kAudioFileStreamError_NotOptimized && status != kAudioFileStreamError_UnsupportedFileType) {
-                    _failed = YES;
-                }
-            }
-            
-            if (status == kAudioFileStreamError_NotOptimized || status == kAudioFileStreamError_UnsupportedFileType) {
-                [self _closeAudioFileStream];
-                _requireAudioFileAPI = YES;
+            if (_audioFileID != NULL) {
+                _readyToProducePackets = YES;
+                _requringRanges = nil;
+                break;
             }
         }
-        else{
-            BOOL requringRangeFullfilled = YES;
-            for(NSArray<NSNumber *> * _Nonnull wrappedRange in _requringRanges) {
-                requringRangeFullfilled &= [self.cacheInfo rangeAvaible:NSMakeRange(wrappedRange.firstObject.unsignedIntegerValue, wrappedRange.lastObject.unsignedIntegerValue)];
-            };
-            if (requringRangeFullfilled ) {
-                _requringRanges = nil;
-                NSArray *fallbackTypeIDs = [self _fallbackTypeIDs];
-                for (NSNumber *typeIDNumber in fallbackTypeIDs) {
-                    AudioFileTypeID typeID = (AudioFileTypeID)[typeIDNumber unsignedLongValue];
-                    [self _openAudioFileWithFileTypeHint:typeID];
-                    
-                    if (_audioFileID != NULL) {
-                        _readyToProducePackets = YES;
-                        _requringRanges = nil;
-                        break;
-                    }
-                }
-                if (!_audioFileID ) {
-                    [self requesetNeededRange];
-                }
-            }
-            
+        if (!_audioFileID ) {
+            [self requesetNeededRange];
         }
     }
-    [self _invokeEventBlock];
 }
 
 - (void)requesetNeededRange
@@ -300,17 +295,18 @@
 
 - (void)_createRequest
 {
-    [self _createRequest:0];
+    [self _createRequest:0 length:0];
 }
 
-- (void)_createRequest:(SInt64)position
+- (void)_createRequest:(SInt64)position length:(NSUInteger)length
 {
     _request = [DOUSimpleHTTPRequest requestWithURL:_audioFileURL];
     NSAssert(position <= _expectedLength, @"require position greater then expectedLength");
     _request.position = (unsigned long long)position;
-    //    if (_expectedLength > 0) {
-    //        _request.length = _expectedLength - 1 - _request.position;
-    //    }
+    _request.userAgent = self.config.userAgent;
+    if (_expectedLength > 0) {
+        _request.length = MIN(_expectedLength - 1 - _request.position,length);
+    }
     _receivedLength = 0;
     if (_audioFileHost != nil) {
         [_request setHost:_audioFileHost];
@@ -332,68 +328,6 @@
     [_request setDidReceiveDataBlock:^(NSData *data) {
         [_self _requestDidReceiveData:data];
     }];
-}
-
-- (void)_handleAudioFileStreamProperty:(AudioFileStreamPropertyID)propertyID
-{
-    if (propertyID == kAudioFileStreamProperty_ReadyToProducePackets) {
-        _readyToProducePackets = YES;
-    }
-}
-
-- (void)_handleAudioFileStreamPackets:(const void *)packets
-                        numberOfBytes:(UInt32)numberOfBytes
-                      numberOfPackets:(UInt32)numberOfPackets
-                   packetDescriptions:(AudioStreamPacketDescription *)packetDescriptioins
-{
-}
-
-static void audio_file_stream_property_listener_proc(void *inClientData,
-                                                     AudioFileStreamID inAudioFileStream,
-                                                     AudioFileStreamPropertyID inPropertyID,
-                                                     UInt32 *ioFlags)
-{
-    __unsafe_unretained _DOUAudioRemoteFileProvider *fileProvider = (__bridge _DOUAudioRemoteFileProvider *)inClientData;
-    [fileProvider _handleAudioFileStreamProperty:inPropertyID];
-}
-
-static void audio_file_stream_packets_proc(void *inClientData,
-                                           UInt32 inNumberBytes,
-                                           UInt32 inNumberPackets,
-                                           const void *inInputData,
-                                           AudioStreamPacketDescription    *inPacketDescriptions)
-{
-    __unsafe_unretained _DOUAudioRemoteFileProvider *fileProvider = (__bridge _DOUAudioRemoteFileProvider *)inClientData;
-    [fileProvider _handleAudioFileStreamPackets:inInputData
-                                  numberOfBytes:inNumberBytes
-                                numberOfPackets:inNumberPackets
-                             packetDescriptions:inPacketDescriptions];
-}
-
-- (void)_openAudioFileStream
-{
-    [self _openAudioFileStreamWithFileTypeHint:0];
-}
-
-- (void)_openAudioFileStreamWithFileTypeHint:(AudioFileTypeID)fileTypeHint
-{
-    OSStatus status = AudioFileStreamOpen((__bridge void *)self,
-                                          audio_file_stream_property_listener_proc,
-                                          audio_file_stream_packets_proc,
-                                          fileTypeHint,
-                                          &_audioFileStreamID);
-    
-    if (status != noErr) {
-        _audioFileStreamID = NULL;
-    }
-}
-
-- (void)_closeAudioFileStream
-{
-    if (_audioFileStreamID != NULL) {
-        AudioFileStreamClose(_audioFileStreamID);
-        _audioFileStreamID = NULL;
-    }
 }
 
 - (NSArray *)_fallbackTypeIDs
@@ -509,11 +443,14 @@ static SInt64 audio_file_get_size(void *inClientData)
 - (void)requireOffset:(SInt64)offset
 {
     NSRange range = [self.cacheInfo nextNeedCacheRangeWithStartOffset:(NSUInteger)offset];
+    if (0 == range.length) {
+        return;
+    }
     if (range.location == _request.position + _request.receivedLength) {
         return;
     }
     [self cancelRequest];
-    [self _createRequest:offset];
+    [self _createRequest:(SInt64)range.location length:0];
     [_request start];
 }
 
@@ -542,12 +479,14 @@ static SInt64 audio_file_get_size(void *inClientData)
                                         &_audioFileID);
     if (status == noErr) {
         _audioFileTypeID = fileTypeHint;
+        self.cacheInfo.audioFileTypeHint = fileTypeHint;
     }
     return status == noErr;
 }
 
 - (void)_closeAudioFile
 {
+    _requringRanges = nil;
     if (_audioFileID != NULL) {
         AudioFileClose(_audioFileID);
         _audioFileID = NULL;
@@ -575,13 +514,6 @@ static SInt64 audio_file_get_size(void *inClientData)
     return [self.cacheInfo isCacheCompleted];
 }
 
-- (DOUCacheInfo *)cacheInfo
-{
-    if (nil == _cacheInfo) {
-        _cacheInfo = [[DOUCacheInfo alloc] init];
-    }
-    return _cacheInfo;
-}
 
 - (NSMutableArray<NSArray<NSNumber *>*> *)requringRanges
 {
@@ -591,7 +523,7 @@ static SInt64 audio_file_get_size(void *inClientData)
     return _requringRanges;
 }
 
-- (void)setRequireRanges:(NSMutableArray *)ranges
+- (void)setRequireRanges:(NSMutableArray * _Nullable)ranges
 {
     _requringRanges = ranges;
 }

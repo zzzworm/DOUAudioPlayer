@@ -28,6 +28,7 @@
 #include <sys/time.h>
 #include <pthread.h>
 #include <sched.h>
+#import <AVFoundation/AVFoundation.h>
 
 typedef NS_ENUM(uint64_t, event_type) {
     event_play,
@@ -79,10 +80,6 @@ typedef NS_ENUM(uint64_t, event_type) {
     if (self) {
         _kq = kqueue();
         pthread_mutex_init(&_mutex, NULL);
-        
-#if TARGET_OS_IPHONE
-        [self _setupAudioSession];
-#endif /* TARGET_OS_IPHONE */
         
         _renderer = [DOUAudioRenderer rendererWithBufferTime:kDOUAudioStreamerBufferTime];
         [_renderer setUp];
@@ -172,41 +169,6 @@ typedef NS_ENUM(uint64_t, event_type) {
     [self _sendEvent:event_old_device_unavailable];
 }
 
-static void audio_session_interruption_listener(void *inClientData, UInt32 inInterruptionState)
-{
-    __unsafe_unretained DOUAudioEventLoop *eventLoop = (__bridge DOUAudioEventLoop *)inClientData;
-    [eventLoop _handleAudioSessionInterruptionWithState:inInterruptionState];
-}
-
-static void audio_route_change_listener(void *inClientData,
-                                        AudioSessionPropertyID inID,
-                                        UInt32 inDataSize,
-                                        const void *inData)
-{
-    if (inID != kAudioSessionProperty_AudioRouteChange) {
-        return;
-    }
-    
-    __unsafe_unretained DOUAudioEventLoop *eventLoop = (__bridge DOUAudioEventLoop *)inClientData;
-    [eventLoop _handleAudioRouteChangeWithDictionary:(__bridge NSDictionary *)inData];
-}
-
-- (void)_setupAudioSession
-{
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated"
-    
-    AudioSessionInitialize(NULL, NULL, audio_session_interruption_listener, (__bridge void *)self);
-    
-    UInt32 audioCategory = kAudioSessionCategory_MediaPlayback;
-    AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof(audioCategory), &audioCategory);
-    
-    AudioSessionAddPropertyListener(kAudioSessionProperty_AudioRouteChange, audio_route_change_listener, (__bridge void *)self);
-    
-    AudioSessionSetActive(TRUE);
-    
-#pragma clang diagnostic pop
-}
 
 #endif /* TARGET_OS_IPHONE */
 
@@ -346,7 +308,7 @@ static void audio_route_change_listener(void *inClientData,
             [*streamer status] == DOUAudioStreamerBuffering) {
             [*streamer setStatus:DOUAudioStreamerPlaying];
         }
-        
+//        [*streamer setDuration:[[*streamer playbackItem] estimatedDuration]/1000.0];
         [*streamer setBufferingRatio:[[*streamer fileProvider] bufferingRatio]];
     }
     else if (event == event_finalizing) {

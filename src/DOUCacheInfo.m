@@ -16,25 +16,26 @@
 
 @implementation DOUCacheInfo
 
-- (instancetype)initWithCoder:(NSCoder *)aDecoder
++ (instancetype)cacheInfoWithFilePath:(NSString *)filePath
 {
-    if (self = [super init]) {
-        self.audioFileURL = [aDecoder decodeObjectForKey:@"audioFileURL"];
-        self.cacheWritePath = [aDecoder decodeObjectForKey:@"cacheWritePath"];
-        self.cacheWriteTmpPath = [aDecoder decodeObjectForKey:@"cacheWriteTmpPath"];
-        self.expectedLength = [aDecoder decodeInt64ForKey:@"expectedLength"];
-        self.cachedSegment = [aDecoder decodeObjectForKey:@"cachedSegment"];
+    if (!filePath) return nil;
+    
+    NSData *data = [NSData dataWithContentsOfFile:filePath];
+    if (!data) return [[DOUCacheInfo alloc] init];
+    NSDictionary *dict = [NSJSONSerialization
+                          JSONObjectWithData:data
+                          options:0
+                          error:nil];
+    DOUCacheInfo *meta = [[DOUCacheInfo alloc] init];
+    meta.expectedLength = [dict[@"Content-Length"] unsignedLongLongValue];
+    meta.ranges = dict[@"ranges"];
+    meta.supportSeek = [dict[@"supportSeek"] boolValue];
+    meta.audioFileTypeHint = (AudioFileTypeID)[dict[@"audioFileTypeHint"] unsignedIntegerValue];
+    meta.audioFileURL = dict[@"audioFileURL"];
+    if (!meta.ranges) {
+        meta.ranges = [NSMutableArray array];
     }
-    return self;
-}
-
-- (void)encodeWithCoder:(NSCoder *)aCoder
-{
-    [aCoder encodeObject:self.audioFileURL forKey:@"audioFileURL"];
-    [aCoder encodeObject:self.cacheWritePath forKey:@"cacheWritePath"];
-    [aCoder encodeObject:self.cacheWriteTmpPath forKey:@"cacheWriteTmpPath"];
-    [aCoder encodeInt64:self.expectedLength forKey:@"expectedLength"];
-    [aCoder encodeObject:self.cachedSegment forKey:@"cachedSegment"];
+    return meta;
 }
 
 - (instancetype)init
@@ -66,8 +67,6 @@
 {
     DOUCacheInfo *copy = [[[self class] allocWithZone:zone] init];
     copy.audioFileURL = self.audioFileURL;
-    copy.cacheWritePath = self.cacheWritePath;
-    copy.cacheWriteTmpPath = self.cacheWriteTmpPath;
     copy.expectedLength = self.expectedLength;
     copy.cachedSegment = [self.cachedSegment copy];
     return copy;
@@ -93,8 +92,8 @@
         }
         if (!found) {
             [_cachedSegment addObject:@[@(range.location), @(NSMaxRange(range))]];
-            [self shrinkRangs];
         }
+        [self shrinkRangs];
     }
 }
 
@@ -203,6 +202,7 @@
     dict[@"ranges"] = _cachedSegment;
     dict[@"supportSeek"] = @(self.supportSeek);
     dict[@"audioFileTypeHint"] = @(self.audioFileTypeHint);
+    dict[@"audioFileURL"] = _audioFileURL;
     [[NSJSONSerialization
       dataWithJSONObject:dict
       options:0

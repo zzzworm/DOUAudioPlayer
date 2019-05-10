@@ -59,10 +59,6 @@ extern DOUAudioFileProvider *gHintProvider;
 
 - (NSUInteger)readIntoBuffer:(UInt8*)buffer withRange:(NSRange)range;
 
-- (void)_closeAudioFile;
-
-- (BOOL)_openAudioFileWithFileTypeHint:(AudioFileTypeID)fileTypeHint;
-
 - (void)lockForRead;
 - (void)unlockForRead;
 

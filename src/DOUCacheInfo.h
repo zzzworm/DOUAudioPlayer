@@ -12,14 +12,13 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface DOUCacheInfo : NSObject <NSCoding, NSCopying>
+@interface DOUCacheInfo : NSObject
 
 @property (nonatomic, strong) NSString* audioFileURL;
-@property (nonatomic, strong) NSString *cacheWritePath;
-@property (nonatomic, strong) NSString *cacheWriteTmpPath;
-@property (nonatomic, assign) SInt64 expectedLength;
+@property (nonatomic, assign) unsigned long long expectedLength;
 @property (nonatomic, assign) BOOL supportSeek;
 @property (nonatomic, assign) AudioFileTypeID audioFileTypeHint;
+
 - (BOOL)isCacheCompleted;
 
 - (BOOL)rangeAvaible:(NSRange)queryRange;
@@ -30,6 +29,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (NSRange)nextNeedCacheRangeWithStartOffset:(NSUInteger)startOffset;
 
+
++ (instancetype)cacheInfoWithFilePath:(NSString *)filePath;
+
+- (void)writeToFile:(NSString *)filePath;
 @end
 
 NS_ASSUME_NONNULL_END

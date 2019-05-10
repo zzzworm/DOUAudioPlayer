@@ -18,11 +18,11 @@
 #include <CoreAudio/CoreAudioTypes.h>
 
 typedef NS_ENUM(NSUInteger, DOUAudioDecoderStatus) {
-  DOUAudioDecoderSucceeded,
-  DOUAudioDecoderFailed,
-  DOUAudioDecoderEndEncountered,
-  DOUAudioDecoderWaiting,
-  DOUAudioDecoderRefreshing,
+    DOUAudioDecoderSucceeded,
+    DOUAudioDecoderFailed,
+    DOUAudioDecoderEndEncountered,
+    DOUAudioDecoderWaiting,
+    DOUAudioDecoderRefreshing,
 };
 
 @class DOUAudioPlaybackItem;
@@ -41,6 +41,7 @@ typedef NS_ENUM(NSUInteger, DOUAudioDecoderStatus) {
 - (BOOL)setUp;
 - (void)tearDown;
 
+- (BOOL)refershAudioFile;
 - (DOUAudioDecoderStatus)decodeOnce;
 - (void)seekToTime:(NSUInteger)milliseconds;
 

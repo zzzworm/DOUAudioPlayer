@@ -21,8 +21,6 @@ NS_ASSUME_NONNULL_BEGIN
     
     CC_SHA256_CTX *_sha256Ctx;
     
-    AudioFileStreamID _audioFileStreamID;
-    BOOL _requireAudioFileAPI;
     BOOL _readyToProducePackets;
     
     AudioFileID _audioFileID;
@@ -31,8 +29,6 @@ NS_ASSUME_NONNULL_BEGIN
     pthread_mutex_t _dataMutex;
 }
 
-@property (readonly, nonatomic, assign)  AudioFileStreamID audioFileStreamID;
-
 @property (readonly, nonatomic, assign)  AudioFileID audioFileID;
 
 @property (readonly, nonatomic, assign)  AudioFileTypeID audioFileTypeID;
@@ -40,11 +36,17 @@ NS_ASSUME_NONNULL_BEGIN
 @property (readonly, nonatomic, assign)  SInt64 waitingPosition;
 
 
-- (NSMutableArray<NSArray<NSNumber *>*> *)requringRanges;
+- (NSMutableArray<NSArray<NSNumber *>*> * _Nullable)requringRanges;
+
+- (void)setRequireRanges:(NSMutableArray * _Nullable)ranges;
+
 - (void)requesetNeededRange;
 
 - (void)requireOffset:(SInt64)offset;
 
+- (void)_closeAudioFile;
+
+- (BOOL)_openAudioFileWithFileTypeHint:(AudioFileTypeID)fileTypeHint;
 @end
 
 NS_ASSUME_NONNULL_END

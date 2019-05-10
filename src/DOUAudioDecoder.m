@@ -66,7 +66,7 @@ typedef struct {
     DecodingContext _decodingContext;
     BOOL _decodingContextInitialized;
     BOOL _setupBeforeFinished;
-    
+    BOOL _needRefreshAudioFile;
     AudioFileID _audioFileID;
 }
 @end
@@ -350,14 +350,15 @@ static OSStatus decoder_data_proc(AudioConverterRef inAudioConverter, UInt32 *io
 
 - (BOOL)refershAudioFile {
     [_playbackItem close];
+    _decodingContext.afio.afid = NULL;
     if (![_playbackItem open]) {
         return NO;
     }
+    _decodingContext.afio.afid = [_playbackItem fileID];
     SInt64 pos = _decodingContext.afio.pos;
     AudioConverterReset(_audioConverter);
-    [self tearDown];
-    [self setUp];
     _decodingContext.afio.pos = pos;
+    _needRefreshAudioFile = NO;
     return YES;
 }
 
@@ -376,82 +377,52 @@ static OSStatus decoder_data_proc(AudioConverterRef inAudioConverter, UInt32 *io
         pthread_mutex_unlock(&_decodingContext.mutex);
         return DOUAudioDecoderFailed;
     }
+    if (_needRefreshAudioFile) {
+        [self refershAudioFile];
+    }
     if (![provider isFinished]) {
         
         _DOUAudioRemoteFileProvider *remoteProvider = (_DOUAudioRemoteFileProvider *)provider;
         
-        NSUInteger audioDataOffset = [_playbackItem dataOffset];
-        
-        AudioStreamBasicDescription srcASBD = _decodingContext.afio.srcFormat;
-        NSUInteger bytesPerPacket = _decodingContext.afio.srcSizePerPacket?:srcASBD.mBytesPerPacket ?: srcASBD.mFramesPerPacket * (srcASBD.mBytesPerFrame?:(srcASBD.mChannelsPerFrame * (srcASBD.mBitsPerChannel?:1)));
-        NSUInteger bytesPerRead = (NSUInteger)bytesPerPacket * _decodingContext.afio.numPacketsPerRead;
-        
-        NSUInteger seekByteOffset = audioDataOffset + (NSUInteger)_decodingContext.afio.pos * bytesPerPacket;
-        NSRange needRange = NSMakeRange(seekByteOffset, MIN(bytesPerRead,[remoteProvider expectedLength] - seekByteOffset));
-        if(remoteProvider.audioFileStreamID){
-            UInt32 ioFlags = 0;
-            SInt64 packetAlignedByteOffset;
-            OSStatus error = AudioFileStreamSeek(remoteProvider.audioFileStreamID, _decodingContext.afio.pos, &packetAlignedByteOffset, &ioFlags);
-            
-            if (!error) {
-                seekByteOffset = (NSUInteger)packetAlignedByteOffset + audioDataOffset;
-                needRange = NSMakeRange(seekByteOffset, MIN(bytesPerRead,[remoteProvider expectedLength] - seekByteOffset));
-                //                if (!(ioFlags & kAudioFileStreamSeekFlag_OffsetIsEstimated)) { //
-                //
-                //                }
-                if(![provider rangeAvaiable:needRange]){
-                    [provider unlockForRead];
-                    pthread_mutex_unlock(&_decodingContext.mutex);
-                    return DOUAudioDecoderWaiting;
-                }
+        //use audiofile API
+        if (NULL == remoteProvider.audioFileID || remoteProvider.audioFileID != _audioFileID) {
+            [remoteProvider _closeAudioFile];
+            if([remoteProvider _openAudioFileWithFileTypeHint:remoteProvider.audioFileTypeID]){
+                _audioFileID = remoteProvider.audioFileID;
             }
             else{
-                [provider unlockForRead];
-                pthread_mutex_unlock(&_decodingContext.mutex);
-                return DOUAudioDecoderWaiting;
+                NSAssert(NO, @"can't open audio file");
             }
         }
-//        else if(![provider rangeAvaiable:needRange]){
-//            [remoteProvider requireOffset:needRange.location];
-//            [provider unlockForRead];
-//            pthread_mutex_unlock(&_decodingContext.mutex);
-//            return DOUAudioDecoderWaiting;
-//        }
-        else if( remoteProvider.audioFileID){ //use audiofile API
-            if (remoteProvider.audioFileID != _audioFileID) {
-                [remoteProvider _closeAudioFile];
-                if([remoteProvider _openAudioFileWithFileTypeHint:remoteProvider.audioFileTypeID]){
-                    _audioFileID = remoteProvider.audioFileID;
-                }
-                else{
-                    NSAssert(NO, @"can't open audio file");
-                }
-            }
-            AudioFileIO afio;
-            memcpy(&afio,&_decodingContext.afio,sizeof(AudioFileIO));
-            UInt32 ioNumBytes = afio.srcBufferSize/2;
-            UInt32 ioNumberDataPackets = _decodingContext.numOutputPackets/2;
+        AudioFileIO afio;
+        memcpy(&afio,&_decodingContext.afio,sizeof(AudioFileIO));
+        UInt32 ioNumBytes = afio.srcBufferSize;
+        UInt32 ioNumberDataPackets = 1;
+        [remoteProvider setRequireRanges:nil];
+        OSStatus status = AudioFileReadPacketData(_audioFileID, FALSE, &ioNumBytes, afio.pktDescs, afio.pos, &ioNumberDataPackets, afio.srcBuffer);
+        if ((status != noErr || 0 == ioNumberDataPackets) && 0 == remoteProvider.requringRanges.count) {
             
-            OSStatus status = AudioFileReadPacketData(_audioFileID, FALSE, &ioNumBytes, afio.pktDescs, afio.pos, &ioNumberDataPackets, afio.srcBuffer);
-            if (status != noErr || 0 == ioNumBytes) {
-                if (remoteProvider.requringRanges.count) {
-                    [remoteProvider requesetNeededRange];
-                }
-                else{
-                    [remoteProvider requireOffset:(SInt64)needRange.location];
-                }
-                [remoteProvider _closeAudioFile];
-                if([remoteProvider _openAudioFileWithFileTypeHint:remoteProvider.audioFileTypeID]){
-                    _audioFileID = remoteProvider.audioFileID;
-                }
-                else{
-                    NSAssert(NO, @"can't open audio file");
-                }
-                [provider unlockForRead];
-                pthread_mutex_unlock(&_decodingContext.mutex);
-                return DOUAudioDecoderWaiting;
+            [remoteProvider _closeAudioFile];
+            if([remoteProvider _openAudioFileWithFileTypeHint:remoteProvider.audioFileTypeID]){
+                _audioFileID = remoteProvider.audioFileID;
+                UInt32 ioNumBytes = afio.srcBufferSize;
+                UInt32 ioNumberDataPackets = 1;
+                [remoteProvider setRequireRanges:nil];
+                status = AudioFileReadPacketData(_audioFileID, FALSE, &ioNumBytes, afio.pktDescs, afio.pos, &ioNumberDataPackets, afio.srcBuffer);
             }
+            else{
+                NSAssert(NO, @"can't open audio file");
+            }
+            
         }
+        [provider unlockForRead];
+        if (remoteProvider.requringRanges.count) {
+            [remoteProvider requesetNeededRange];
+            _needRefreshAudioFile = YES;
+            pthread_mutex_unlock(&_decodingContext.mutex);
+            return DOUAudioDecoderWaiting;
+        }
+        
         
     }
     
@@ -471,7 +442,7 @@ static OSStatus decoder_data_proc(AudioConverterRef inAudioConverter, UInt32 *io
             pthread_mutex_unlock(&_decodingContext.mutex);
             return DOUAudioDecoderFailed;
         }
-        else{
+        else if(status != -50){
             if([self refershAudioFile]){
                 [provider unlockForRead];
                 pthread_mutex_unlock(&_decodingContext.mutex);
@@ -487,7 +458,7 @@ static OSStatus decoder_data_proc(AudioConverterRef inAudioConverter, UInt32 *io
     }
     
     if (ioOutputDataPackets == 0) {
-        if (!_setupBeforeFinished) {
+        if (!_setupBeforeFinished || _decodingContext.afio.pos == _playbackItem.audioDataPacketCount) {
             [_lpcm setEnd:YES];
             [provider unlockForRead];
             pthread_mutex_unlock(&_decodingContext.mutex);
