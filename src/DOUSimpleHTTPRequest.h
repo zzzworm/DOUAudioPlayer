@@ -47,7 +47,7 @@ typedef void (^DOUSimpleHTTPRequestDidReceiveDataBlock)(NSData *data);
 
 @property (nonatomic, readonly) NSUInteger downloadSpeed;
 @property (nonatomic, readonly, getter=isFailed) BOOL failed;
-
+@property (nonatomic, readonly, getter=isFinished) BOOL finished;
 @property (nonatomic, readonly) BOOL supportsSeek;
 
 @property (copy) DOUSimpleHTTPRequestCompletedBlock completedBlock;

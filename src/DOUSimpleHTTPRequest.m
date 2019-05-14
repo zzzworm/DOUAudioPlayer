@@ -93,6 +93,7 @@ static CFRunLoopRef controller_get_runloop()
     NSInteger _statusCode;
     NSString *_statusMessage;
     BOOL _failed;
+    BOOL _finished;
     BOOL _supportsSeek;
     
     CFAbsoluteTime _startedTime;
@@ -117,6 +118,7 @@ static CFRunLoopRef controller_get_runloop()
 
 @synthesize downloadSpeed = _downloadSpeed;
 @synthesize failed = _failed;
+@synthesize finished = _finished;
 @synthesize supportsSeek = _supportsSeek;
 @synthesize completedBlock = _completedBlock;
 @synthesize progressBlock = _progressBlock;
@@ -224,6 +226,7 @@ static CFRunLoopRef controller_get_runloop()
 - (void)_invokeCompletedBlock
 {
     @synchronized(self) {
+        _finished = YES;
         if (_completedBlock != NULL) {
             _completedBlock();
         }
@@ -364,7 +367,7 @@ static CFRunLoopRef controller_get_runloop()
     
     if (bytesRead > 0) {
         NSData *data = [NSData dataWithBytesNoCopy:buffer length:(NSUInteger)bytesRead freeWhenDone:NO];
-        
+        _receivedLength += (unsigned long)bytesRead;
         @synchronized(self) {
             if (_didReceiveDataBlock == NULL) {
                 if (_responseData == nil) {
@@ -378,7 +381,6 @@ static CFRunLoopRef controller_get_runloop()
             }
         }
         
-        _receivedLength += (unsigned long)bytesRead;
         [self _updateProgress];
         [self _updateDownloadSpeed];
     }
@@ -428,10 +430,7 @@ static void response_stream_client_callback(CFReadStreamRef stream, CFStreamEven
 
 - (void)start
 {
-    if (_responseStream != NULL) {
-        return;
-    }
-    
+
     CFHTTPMessageSetHeaderFieldValue(_message, CFSTR("User-Agent"), (__bridge CFStringRef)self.userAgent);
     if (_host != nil) {
         CFHTTPMessageSetHeaderFieldValue(_message, CFSTR("Host"), (__bridge CFStringRef)_host);
@@ -481,6 +480,7 @@ static void response_stream_client_callback(CFReadStreamRef stream, CFStreamEven
 
 - (void)cancel
 {
+    _finished = NO;
     if (_responseStream == NULL || _failed) {
         return;
     }

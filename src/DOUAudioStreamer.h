@@ -41,7 +41,7 @@ typedef NS_OPTIONS(NSUInteger, DOUAudioStreamerOptions) {
     DOUAudioStreamerRemoveCacheOnDeallocation = 1 << 1,
     DOUAudioStreamerRequireSHA256 = 1 << 2,
     
-    DOUAudioStreamerDefaultOptions = DOUAudioStreamerKeepPersistentVolume
+    DOUAudioStreamerDefaultOptions = DOUAudioStreamerKeepPersistentVolume | DOUAudioStreamerRemoveCacheOnDeallocation
 };
 
 @interface DOUAudioStreamerConfig : NSObject

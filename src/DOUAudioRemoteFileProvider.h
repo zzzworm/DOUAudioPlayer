@@ -13,21 +13,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface _DOUAudioRemoteFileProvider : DOUAudioFileProvider {
-@private
-    DOUSimpleHTTPRequest *_request;
-    NSURL *_audioFileURL;
-    NSString *_audioFileHost;
-    
-    CC_SHA256_CTX *_sha256Ctx;
-    
-    BOOL _readyToProducePackets;
-    
-    AudioFileID _audioFileID;
-    AudioFileTypeID _audioFileTypeID;
-    NSMutableArray<NSArray<NSNumber *>*> *_requringRanges;
-    pthread_mutex_t _dataMutex;
-}
+@interface _DOUAudioRemoteFileProvider : DOUAudioFileProvider 
 
 @property (readonly, nonatomic, assign)  AudioFileID audioFileID;
 
@@ -47,6 +33,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)_closeAudioFile;
 
 - (BOOL)_openAudioFileWithFileTypeHint:(AudioFileTypeID)fileTypeHint;
+
++ (NSString *)_metaPathForAudioFileURL:(NSURL *)audioFileURL;
 @end
 
 NS_ASSUME_NONNULL_END

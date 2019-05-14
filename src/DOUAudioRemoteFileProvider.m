@@ -13,19 +13,14 @@
 #import "DOUAudioDecoder.h"
 #include <CoreAudio/CoreAudioTypes.h>
 #include <pthread.h>
+#import "DOUAudioRemoteFileProvider_Private.h"
+
 
 #define BitRateEstimationMaxPackets 5000
 #define BitRateEstimationMinPackets 50
 
-#define HTTPRequestMaxLength (15 * 1024 *1024)
-
 #pragma mark - Concrete Audio Remote File Provider
 
-@interface _DOUAudioRemoteFileProvider()
-
-@property (nonatomic, strong) DOUCacheInfo *cacheInfo;
-
-@end
 
 @implementation _DOUAudioRemoteFileProvider
 
@@ -85,13 +80,16 @@
 }
 
 - (void)cancelRequest {
+    if(NULL == _request){
+        return;
+    }
     @synchronized(_request) {
         [_request setCompletedBlock:NULL];
         [_request setProgressBlock:NULL];
         [_request setDidReceiveResponseBlock:NULL];
         [_request setDidReceiveDataBlock:NULL];
-        
         [_request cancel];
+        _request = NULL;
     }
 }
 
@@ -146,7 +144,7 @@
 
 - (void)_requestDidComplete
 {
-    self->_requringRanges = nil;
+    
     if ([_request isFailed] ||
         !([_request statusCode] >= 200 && [_request statusCode] < 300)) {
         _failed = YES;
@@ -155,7 +153,15 @@
         pthread_mutex_lock(&_dataMutex);
         [_mappedData dou_synchronizeMappedFile];
         pthread_mutex_unlock(&_dataMutex);
+        if (![self checkRequireRangeFullfilledAndRemoveFullfilled:YES]) {
+            [self requesetNeededRange];
+        }
+        [self.cacheInfo writeToFile:[self.class _metaPathForAudioFileURL:self.audioFile.audioFileURL]];
     }
+    [self handleRequestComplete];
+}
+
+- (void)handleRequestComplete{
     if (!_failed && self.isFinished && !_audioFileID) {
         _failed = YES;
     }
@@ -172,12 +178,13 @@
         _sha256 = [result copy];
     }
     
-    if (self.isFinished && self.hintFile != nil &&
+    if (self.isReady && _request.position + _request.receivedLength == _expectedLength && self.hintFile != nil &&
         self.hintProvider == nil) {
         self.hintProvider = [[[self class] alloc] _initWithAudioFile:self.hintFile config:self.config];
     }
-    [self.cacheInfo writeToFile:[self.class _metaPathForAudioFileURL:self.audioFile.audioFileURL]];
+    
     [self _invokeEventBlock];
+    _request = nil;
 }
 
 - (void)_requestDidReportProgress:(double)progress
@@ -230,7 +237,9 @@
     }
     if ([self requireRangeFullfilled]) {
         _requringRanges = nil;
-        [self _invokeEventBlock];
+        if ([self shouldInvokeDecoder]) {
+            [self _invokeEventBlock];
+        }
     }
 }
 
@@ -251,12 +260,30 @@
 }
 
 
-- (BOOL)requireRangeFullfilled {
+- (BOOL)checkRequireRangeFullfilledAndRemoveFullfilled:(BOOL)remove {
     BOOL requringRangeFullfilled = YES;
+    NSMutableArray *fullfilled = [NSMutableArray arrayWithCapacity:_requringRanges.count];
     for(NSArray<NSNumber *> * _Nonnull wrappedRange in _requringRanges) {
-        requringRangeFullfilled &= [self.cacheInfo rangeAvaible:NSMakeRange(wrappedRange.firstObject.unsignedIntegerValue, wrappedRange.lastObject.unsignedIntegerValue)];
+        if ([self.cacheInfo rangeAvaible:NSMakeRange(wrappedRange.firstObject.unsignedIntegerValue, wrappedRange.lastObject.unsignedIntegerValue)]) {
+            requringRangeFullfilled &= YES;
+            [fullfilled addObject:wrappedRange];
+        }
+        else{
+            requringRangeFullfilled &= NO;
+            break;
+        }
     }
+    if (remove) {
+        for(NSArray<NSNumber *> * _Nonnull wrappedRange in fullfilled) {
+            [_requringRanges removeObject:wrappedRange];
+        }
+    }
+    
     return requringRangeFullfilled;
+}
+
+- (BOOL)requireRangeFullfilled {
+    return [self checkRequireRangeFullfilledAndRemoveFullfilled:NO];
 }
 
 - (void)tryOpenAudioFile
@@ -283,14 +310,15 @@
 
 - (void)requesetNeededRange
 {
-    if (_requringRanges.count) {
-        NSUInteger rangeMin = self.expectedLength;
-        for(NSArray<NSNumber *> * _Nonnull wrappedRange in _requringRanges) {
-            rangeMin = MIN(rangeMin, wrappedRange.firstObject.unsignedIntegerValue);
-        };
-        NSRange needRange = [self.cacheInfo nextNeedCacheRangeWithStartOffset:rangeMin];
-        [self requireOffset:(SInt64)needRange.location];
+    if (0 == _requringRanges.count) {
+        return;
     }
+    NSUInteger rangeMin = self.expectedLength;
+    for(NSArray<NSNumber *> * _Nonnull wrappedRange in _requringRanges) {
+        rangeMin = MIN(rangeMin, wrappedRange.firstObject.unsignedIntegerValue);
+    };
+    [self requireOffset:(SInt64)rangeMin];
+    
 }
 
 - (void)_createRequest
@@ -446,7 +474,7 @@ static SInt64 audio_file_get_size(void *inClientData)
     if (0 == range.length) {
         return;
     }
-    if (range.location == _request.position + _request.receivedLength) {
+    if (_request && !_request.isFinished && range.location == _request.position + _request.receivedLength) {
         return;
     }
     [self cancelRequest];
@@ -482,6 +510,11 @@ static SInt64 audio_file_get_size(void *inClientData)
         self.cacheInfo.audioFileTypeHint = fileTypeHint;
     }
     return status == noErr;
+}
+
+- (BOOL)shouldInvokeDecoder
+{
+    return YES;
 }
 
 - (void)_closeAudioFile

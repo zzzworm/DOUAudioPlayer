@@ -378,7 +378,11 @@ static OSStatus decoder_data_proc(AudioConverterRef inAudioConverter, UInt32 *io
         return DOUAudioDecoderFailed;
     }
     if (_needRefreshAudioFile) {
-        [self refershAudioFile];
+        if(![self refershAudioFile]){
+            [provider unlockForRead];
+            pthread_mutex_unlock(&_decodingContext.mutex);
+            return DOUAudioDecoderFailed;
+        }
     }
     if (![provider isFinished]) {
         
@@ -442,17 +446,13 @@ static OSStatus decoder_data_proc(AudioConverterRef inAudioConverter, UInt32 *io
             pthread_mutex_unlock(&_decodingContext.mutex);
             return DOUAudioDecoderFailed;
         }
-        else if(status != -50){
-            if([self refershAudioFile]){
+        else if(status != noErr){
+            _needRefreshAudioFile = YES;
+            if(ioOutputDataPackets == 0 || status != -50){
                 [provider unlockForRead];
                 pthread_mutex_unlock(&_decodingContext.mutex);
                 return DOUAudioDecoderRefreshing;
                 
-            }
-            else{
-                [provider unlockForRead];
-                pthread_mutex_unlock(&_decodingContext.mutex);
-                return DOUAudioDecoderFailed;
             }
         }
     }
@@ -465,17 +465,10 @@ static OSStatus decoder_data_proc(AudioConverterRef inAudioConverter, UInt32 *io
             return DOUAudioDecoderEndEncountered;
         }
         else{
-            if([self refershAudioFile]){
-                [provider unlockForRead];
-                pthread_mutex_unlock(&_decodingContext.mutex);
-                return DOUAudioDecoderRefreshing;
-                
-            }
-            else{
-                [provider unlockForRead];
-                pthread_mutex_unlock(&_decodingContext.mutex);
-                return DOUAudioDecoderFailed;
-            }
+            _needRefreshAudioFile = YES;
+            [provider unlockForRead];
+            pthread_mutex_unlock(&_decodingContext.mutex);
+            return DOUAudioDecoderRefreshing;
         }
     }
     

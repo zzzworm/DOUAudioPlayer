@@ -12,7 +12,7 @@
 #import "DOUAudioFileProvider.h"
 
 @interface DOUAudioFileProvider () {
-@protected
+@public
     id <DOUAudioFile> _audioFile;
     DOUAudioFileProviderEventBlock _eventBlock;
     NSString *_cachedPath;

@@ -18,7 +18,7 @@
 #import "DOUSimpleHTTPRequest.h"
 #import "NSData+DOUMappedFile.h"
 #include <CommonCrypto/CommonDigest.h>
-#import "DOUAudioRemoteFileProvider.h"
+#import "DOUAudioAutoRecoverRemoteFileProvider.h"
 #import "DOUAudioLocalFileProvider.h"
 #import "DOUAudioFileProvider_Private.h"
 
@@ -187,7 +187,7 @@
     }
 #endif /* TARGET_OS_IPHONE */
     else {
-        return [[_DOUAudioRemoteFileProvider alloc] _initWithAudioFile:audioFile config:config];
+        return [[_DOUAudioAutoRecoverRemoteFileProvider alloc] _initWithAudioFile:audioFile config:config];
     }
 }
 

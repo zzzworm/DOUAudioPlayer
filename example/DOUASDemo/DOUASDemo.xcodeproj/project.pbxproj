@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5F62C71722858B70006DEA0E /* DOUAudioAutoRecoverRemoteFileProvider.m in Sources */ = {isa = PBXBuildFile; fileRef = 5F62C71622858B70006DEA0E /* DOUAudioAutoRecoverRemoteFileProvider.m */; };
 		5F7CF3B4216B59C200498518 /* AUiPodTimeProxy.m in Sources */ = {isa = PBXBuildFile; fileRef = 5F7CF3B2216B59C100498518 /* AUiPodTimeProxy.m */; };
 		5FD3A2D4227EF26A006F9B9A /* DOUAudioLocalFileProvider.m in Sources */ = {isa = PBXBuildFile; fileRef = 5FD3A2D3227EF26A006F9B9A /* DOUAudioLocalFileProvider.m */; };
 		5FD3A2D6228027D8006F9B9A /* sample.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 5FD3A2D5228027D8006F9B9A /* sample.m4a */; };
@@ -56,6 +57,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		5F121FD02289521800ECB652 /* DOUAudioRemoteFileProvider_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOUAudioRemoteFileProvider_Private.h; sourceTree = "<group>"; };
+		5F62C71522858B6F006DEA0E /* DOUAudioAutoRecoverRemoteFileProvider.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOUAudioAutoRecoverRemoteFileProvider.h; sourceTree = "<group>"; };
+		5F62C71622858B70006DEA0E /* DOUAudioAutoRecoverRemoteFileProvider.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DOUAudioAutoRecoverRemoteFileProvider.m; sourceTree = "<group>"; };
 		5F7CF3B2216B59C100498518 /* AUiPodTimeProxy.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AUiPodTimeProxy.m; sourceTree = "<group>"; };
 		5F7CF3B3216B59C100498518 /* AUiPodTimeProxy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AUiPodTimeProxy.h; sourceTree = "<group>"; };
 		5FD3A2D2227EF26A006F9B9A /* DOUAudioLocalFileProvider.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOUAudioLocalFileProvider.h; sourceTree = "<group>"; };
@@ -217,6 +221,9 @@
 				5FECCF8021707A880019FAFB /* DOUAudioPlayer.m */,
 				5FD3A2D2227EF26A006F9B9A /* DOUAudioLocalFileProvider.h */,
 				5FD3A2D3227EF26A006F9B9A /* DOUAudioLocalFileProvider.m */,
+				5F62C71522858B6F006DEA0E /* DOUAudioAutoRecoverRemoteFileProvider.h */,
+				5F62C71622858B70006DEA0E /* DOUAudioAutoRecoverRemoteFileProvider.m */,
+				5F121FD02289521800ECB652 /* DOUAudioRemoteFileProvider_Private.h */,
 			);
 			name = DOUAudioStreamer;
 			path = ../../../src;
@@ -364,6 +371,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5F62C71722858B70006DEA0E /* DOUAudioAutoRecoverRemoteFileProvider.m in Sources */,
 				D47CA3A717680AF1002D73B4 /* DOUAudioFrequencyAnalyzer.m in Sources */,
 				D4C3892F171B9D87009D6124 /* main.m in Sources */,
 				5FECCF8121707A880019FAFB /* DOUAudioPlayer.m in Sources */,
