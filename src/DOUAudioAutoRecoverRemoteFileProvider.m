@@ -260,6 +260,7 @@ static void ReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkReach
     }
     
     NSLog(@"attemptReconnect %lld/%lu", _request.position, (unsigned long)_request.length);
+    _receivedLength = 0;
     [_request start];
 }
 
@@ -279,7 +280,7 @@ static void ReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkReach
     }
     _requireOffset = offset;
     [self cancelRequest];
-    [self _createRequest:(SInt64)range.location length:DOUHTTPRequestMaxLength-range.location-offset];
+    [self _createRequest:(SInt64)range.location length:DOUHTTPRequestMaxLength];
     [_request start];
 }
 

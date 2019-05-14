@@ -184,7 +184,7 @@
     }
     
     [self _invokeEventBlock];
-    _request = nil;
+    
 }
 
 - (void)_requestDidReportProgress:(double)progress
@@ -222,9 +222,9 @@
     
     memcpy((uint8_t *)[_mappedData bytes] + _receivedLength + _request.position, [data bytes], bytesToWrite);
     
-    _receivedLength += bytesToWrite;
+    NSRange currentReceivedRange = NSMakeRange((NSUInteger)_receivedLength + _request.position,bytesToWrite);
     
-    NSRange currentReceivedRange = NSMakeRange(_request.position,_receivedLength);
+    _receivedLength += bytesToWrite;
     
     [self.cacheInfo append:currentReceivedRange];
     pthread_mutex_unlock(&_dataMutex);
@@ -235,7 +235,7 @@
     if (!_readyToProducePackets && !_failed) {
         [self tryOpenAudioFile];
     }
-    if ([self requireRangeFullfilled]) {
+    if (_readyToProducePackets && [self requireRangeFullfilled]) {
         _requringRanges = nil;
         if ([self shouldInvokeDecoder]) {
             [self _invokeEventBlock];
@@ -270,7 +270,6 @@
         }
         else{
             requringRangeFullfilled &= NO;
-            break;
         }
     }
     if (remove) {
@@ -288,24 +287,62 @@
 
 - (void)tryOpenAudioFile
 {
-    BOOL requringRangeFullfilled = [self requireRangeFullfilled];;
+    BOOL requringRangeFullfilled = [self checkRequireRangeFullfilledAndRemoveFullfilled:YES];
     if (requringRangeFullfilled ) {
         _requringRanges = nil;
-        NSArray *fallbackTypeIDs = [self _fallbackTypeIDs];
-        for (NSNumber *typeIDNumber in fallbackTypeIDs) {
-            AudioFileTypeID typeID = (AudioFileTypeID)[typeIDNumber unsignedLongValue];
-            [self _openAudioFileWithFileTypeHint:typeID];
-            
-            if (_audioFileID != NULL) {
-                _readyToProducePackets = YES;
-                _requringRanges = nil;
-                break;
-            }
+        
+        if ([self open]) {
+            _readyToProducePackets = YES;
+            _requringRanges = nil;
         }
-        if (!_audioFileID ) {
+        else{
             [self requesetNeededRange];
         }
     }
+    else{
+        [self requesetNeededRange];
+    }
+}
+
+- (BOOL)isOpened
+{
+    return _audioFileID != NULL;
+}
+
+- (BOOL)open
+{
+    if ([self isOpened]) {
+        return YES;
+    }
+    
+    if (![self _openAudioFileWithFileTypeHint:0] &&
+        ![self _openWithFallbacks]) {
+        _audioFileID = NULL;
+        return NO;
+    }
+    _requringRanges = nil;
+    if (![self _fillFileFormat] ||
+        ![self _fillMiscProperties]) {
+        AudioFileClose(_audioFileID);
+        _audioFileID = NULL;
+        return NO;
+    }
+    
+    return YES;
+}
+
+
+- (BOOL)_openWithFallbacks
+{
+    NSArray *fallbackTypeIDs = [self _fallbackTypeIDs];
+    for (NSNumber *typeIDNumber in fallbackTypeIDs) {
+        AudioFileTypeID typeID = (AudioFileTypeID)[typeIDNumber unsignedLongValue];
+        if ([self _openAudioFileWithFileTypeHint:typeID]) {
+            return YES;
+        }
+    }
+    
+    return NO;
 }
 
 - (void)requesetNeededRange
@@ -313,7 +350,7 @@
     if (0 == _requringRanges.count) {
         return;
     }
-    NSUInteger rangeMin = self.expectedLength;
+    unsigned long long rangeMin = self.expectedLength;
     for(NSArray<NSNumber *> * _Nonnull wrappedRange in _requringRanges) {
         rangeMin = MIN(rangeMin, wrappedRange.firstObject.unsignedIntegerValue);
     };
@@ -333,7 +370,7 @@
     _request.position = (unsigned long long)position;
     _request.userAgent = self.config.userAgent;
     if (_expectedLength > 0) {
-        _request.length = MIN(_expectedLength - 1 - _request.position,length);
+        _request.length = MIN((NSUInteger)(_expectedLength - _request.position), length);
     }
     _receivedLength = 0;
     if (_audioFileHost != nil) {
@@ -474,7 +511,7 @@ static SInt64 audio_file_get_size(void *inClientData)
     if (0 == range.length) {
         return;
     }
-    if (_request && !_request.isFinished && range.location == _request.position + _request.receivedLength) {
+    if (_request && !_request.isFinished && range.location >= _request.position && (0 == _request.length || range.location < _request.length + _request.position)) { //avoid already request
         return;
     }
     [self cancelRequest];
@@ -511,6 +548,126 @@ static SInt64 audio_file_get_size(void *inClientData)
     }
     return status == noErr;
 }
+
+
+- (BOOL)_fillFileFormat
+{
+    UInt32 size;
+    OSStatus status;
+    
+    status = AudioFileGetPropertyInfo(_audioFileID, kAudioFilePropertyFormatList, &size, NULL);
+    if (status != noErr) {
+        return NO;
+    }
+    
+    UInt32 numFormats = size / sizeof(AudioFormatListItem);
+    AudioFormatListItem *formatList = (AudioFormatListItem *)malloc(size);
+    
+    status = AudioFileGetProperty(_audioFileID, kAudioFilePropertyFormatList, &size, formatList);
+    if (status != noErr) {
+        free(formatList);
+        return NO;
+    }
+    
+    if (numFormats == 1) {
+        _fileFormat = formatList[0].mASBD;
+    }
+    else {
+        status = AudioFormatGetPropertyInfo(kAudioFormatProperty_DecodeFormatIDs, 0, NULL, &size);
+        if (status != noErr) {
+            free(formatList);
+            return NO;
+        }
+        
+        UInt32 numDecoders = size / sizeof(OSType);
+        OSType *decoderIDS = (OSType *)malloc(size);
+        
+        status = AudioFormatGetProperty(kAudioFormatProperty_DecodeFormatIDs, 0, NULL, &size, decoderIDS);
+        if (status != noErr) {
+            free(formatList);
+            free(decoderIDS);
+            return NO;
+        }
+        
+        UInt32 i;
+        for (i = 0; i < numFormats; ++i) {
+            OSType decoderID = formatList[i].mASBD.mFormatID;
+            
+            BOOL found = NO;
+            for (UInt32 j = 0; j < numDecoders; ++j) {
+                if (decoderID == decoderIDS[j]) {
+                    found = YES;
+                    break;
+                }
+            }
+            
+            if (found) {
+                break;
+            }
+        }
+        
+        free(decoderIDS);
+        
+        if (i >= numFormats) {
+            free(formatList);
+            return NO;
+        }
+        
+        _fileFormat = formatList[i].mASBD;
+    }
+    
+    free(formatList);
+    return YES;
+}
+
+- (BOOL)_fillMiscProperties
+{
+    UInt32 size;
+    OSStatus status;
+    
+    UInt32 bitRate = 0;
+    size = sizeof(bitRate);
+    status = AudioFileGetProperty(_audioFileID, kAudioFilePropertyBitRate, &size, &bitRate);
+    if (status != noErr) {
+        return NO;
+    }
+    _bitRate = bitRate;
+    
+    SInt64 dataOffset = 0;
+    size = sizeof(dataOffset);
+    status = AudioFileGetProperty(_audioFileID, kAudioFilePropertyDataOffset, &size, &dataOffset);
+    if (status != noErr) {
+        return NO;
+    }
+    _dataOffset = (NSUInteger)dataOffset;
+    
+    Float64 estimatedDuration = 0.0;
+    size = sizeof(estimatedDuration);
+    status = AudioFileGetProperty(_audioFileID, kAudioFilePropertyEstimatedDuration, &size, &estimatedDuration);
+    if (status != noErr) {
+        return NO;
+    }
+    _estimatedDuration = estimatedDuration * 1000.0;
+    
+    SInt64 audioDataByteCount = 0;
+    size = sizeof(audioDataByteCount);
+    status = AudioFileGetProperty(_audioFileID, kAudioFilePropertyAudioDataByteCount, &size, &audioDataByteCount);
+    if (status != noErr) {
+        return NO;
+    }
+    _audioDataByteCount = (NSUInteger)audioDataByteCount;
+    
+    SInt64 audioDataPacketCount = 0;
+    size = sizeof(audioDataPacketCount);
+    status = AudioFileGetProperty(_audioFileID, kAudioFilePropertyAudioDataPacketCount, &size, &audioDataPacketCount);
+    if (status != noErr) {
+        return NO;
+    }
+    _audioDataPacketCount = (NSUInteger)audioDataPacketCount;
+    
+    return YES;
+}
+
 
 - (BOOL)shouldInvokeDecoder
 {

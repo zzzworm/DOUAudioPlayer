@@ -457,6 +457,20 @@ static void response_stream_client_callback(CFReadStreamRef stream, CFStreamEven
     CFReadStreamSetProperty(_responseStream, CFSTR("_kCFStreamPropertyWriteTimeout"), (__bridge CFNumberRef)[NSNumber numberWithDouble:_timeoutInterval]);
     
     
+    CFReadStreamSetProperty(_responseStream, (__bridge CFStringRef)NSStreamNetworkServiceTypeBackground, (__bridge CFStringRef)NSStreamNetworkServiceTypeBackground);
+    
+    if (!CFReadStreamSetProperty(_responseStream, kCFStreamPropertyHTTPShouldAutoredirect, kCFBooleanTrue))
+    {
+        CFRelease(_responseStream);
+        
+        return;
+    }
+    
+    // Proxy support
+    CFDictionaryRef proxySettings = CFNetworkCopySystemProxySettings();
+    CFReadStreamSetProperty(_responseStream, kCFStreamPropertyHTTPProxy, proxySettings);
+    CFRelease(proxySettings);
+    
     // SSL Support
     if ([_url.scheme.lowercaseString isEqualToString:@"https"]){
         NSDictionary *sslSettings = @{

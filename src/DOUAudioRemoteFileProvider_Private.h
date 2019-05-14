@@ -25,6 +25,13 @@
     AudioFileTypeID _audioFileTypeID;
     NSMutableArray<NSArray<NSNumber *>*> *_requringRanges;
     pthread_mutex_t _dataMutex;
+    
+    AudioStreamBasicDescription _fileFormat;
+    NSUInteger _bitRate;
+    NSUInteger _dataOffset;
+    NSUInteger _estimatedDuration;
+    NSUInteger _audioDataByteCount;
+    NSUInteger _audioDataPacketCount;
 }
 
 @property (nonatomic, strong) DOUCacheInfo *cacheInfo;
