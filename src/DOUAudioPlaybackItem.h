@@ -43,7 +43,12 @@
 @property (nonatomic, readonly) NSUInteger audioDataPacketCount;
 @property (nonatomic, readonly, getter=isOpened) BOOL opened;
 
+@property (nonatomic, readonly) BOOL cacheMissed;
+
+@property (nonatomic, strong) NSMutableArray<NSArray<NSNumber *>*> * requringRanges;
+
 - (BOOL)open;
 - (void)close;
 
+- (BOOL)_fillMiscProperties;
 @end

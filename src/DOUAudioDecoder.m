@@ -66,8 +66,7 @@ typedef struct {
     DecodingContext _decodingContext;
     BOOL _decodingContextInitialized;
     BOOL _setupBeforeFinished;
-    BOOL _needRefreshAudioFile;
-    AudioFileID _audioFileID;
+    
 }
 @end
 
@@ -330,7 +329,7 @@ static OSStatus decoder_data_proc(AudioConverterRef inAudioConverter, UInt32 *io
     }
     
     UInt32 outNumBytes = afio->srcBufferSize;
-    OSStatus status = AudioFileReadPacketData(afio->afid, FALSE, &outNumBytes, afio->pktDescs, afio->pos, ioNumberDataPackets, afio->srcBuffer);
+    OSStatus status = AudioFileReadPacketData(afio->afid, YES, &outNumBytes, afio->pktDescs, afio->pos, ioNumberDataPackets, afio->srcBuffer);
     if (status != noErr) {
         return status;
     }
@@ -349,6 +348,7 @@ static OSStatus decoder_data_proc(AudioConverterRef inAudioConverter, UInt32 *io
 }
 
 - (BOOL)refershAudioFile {
+    _playbackItem.requringRanges = nil;
     [_playbackItem close];
     _decodingContext.afio.afid = NULL;
     if (![_playbackItem open]) {
@@ -358,8 +358,51 @@ static OSStatus decoder_data_proc(AudioConverterRef inAudioConverter, UInt32 *io
     SInt64 pos = _decodingContext.afio.pos;
     AudioConverterReset(_audioConverter);
     _decodingContext.afio.pos = pos;
-    _needRefreshAudioFile = NO;
     return YES;
+}
+
+- (DOUAudioDecoderStatus)handleNoMorePacketsWhenUnFinshed:(_DOUAudioRemoteFileProvider *)remoteProvider {
+    
+    if (_playbackItem.requringRanges.count) {
+        return DOUAudioDecoderWaiting;
+    }
+    else{
+        if (![self refershAudioFile]) {
+            return DOUAudioDecoderFailed;
+        }
+        else if ([_playbackItem audioDataPacketCount] > _decodingContext.afio.pos) {
+            return DOUAudioDecoderRefreshing;
+        }
+        else if(_playbackItem.requringRanges.count){
+//            AudioFileIO afio;
+//            memcpy(&afio,&_decodingContext.afio,sizeof(AudioFileIO));
+//            afio.pos += 1;
+//            UInt32 ioNumBytes = afio.srcBufferSize;
+//            UInt32 ioNumberDataPackets = 1;
+//            _playbackItem.requringRanges = nil;
+//
+//            OSStatus status = AudioFileReadPackets(_playbackItem.fileID, FALSE, &ioNumBytes, afio.pktDescs, afio.pos, &ioNumberDataPackets, afio.srcBuffer);
+//            if (_playbackItem.requringRanges.count > 0){
+                return DOUAudioDecoderWaiting;
+//            }
+//            else {
+//                if(_playbackItem.audioDataPacketCount == _decodingContext.afio.pos){
+//                    return DOUAudioDecoderEndEncountered;
+//                }
+//                else{
+//                    return DOUAudioDecoderFailed;
+//                }
+//            }
+        }
+        else{
+            if(_playbackItem.audioDataPacketCount == _decodingContext.afio.pos){
+                return DOUAudioDecoderEndEncountered;
+            }
+            else{
+                return DOUAudioDecoderFailed;
+            }
+        }
+    }
 }
 
 - (DOUAudioDecoderStatus)decodeOnce
@@ -377,59 +420,15 @@ static OSStatus decoder_data_proc(AudioConverterRef inAudioConverter, UInt32 *io
         pthread_mutex_unlock(&_decodingContext.mutex);
         return DOUAudioDecoderFailed;
     }
-    if (_needRefreshAudioFile) {
-        if(![self refershAudioFile]){
+    if (_playbackItem.requringRanges.count) {
+        [self refershAudioFile];
+        if ([_playbackItem audioDataPacketCount] < _decodingContext.afio.pos) {
             [provider unlockForRead];
-            pthread_mutex_unlock(&_decodingContext.mutex);
-            return DOUAudioDecoderFailed;
-        }
-    }
-    if (![provider isFinished]) {
-        
-        _DOUAudioRemoteFileProvider *remoteProvider = (_DOUAudioRemoteFileProvider *)provider;
-        
-        //use audiofile API
-        if (NULL == remoteProvider.audioFileID || remoteProvider.audioFileID != _audioFileID) {
-            [remoteProvider _closeAudioFile];
-            if([remoteProvider _openAudioFileWithFileTypeHint:remoteProvider.audioFileTypeID]){
-                _audioFileID = remoteProvider.audioFileID;
-            }
-            else{
-                NSAssert(NO, @"can't open audio file");
-            }
-        }
-        AudioFileIO afio;
-        memcpy(&afio,&_decodingContext.afio,sizeof(AudioFileIO));
-        UInt32 ioNumBytes = afio.srcBufferSize;
-        UInt32 ioNumberDataPackets = 1;
-        [remoteProvider setRequireRanges:nil];
-        OSStatus status = AudioFileReadPacketData(_audioFileID, FALSE, &ioNumBytes, afio.pktDescs, afio.pos, &ioNumberDataPackets, afio.srcBuffer);
-        if ((status != noErr || 0 == ioNumberDataPackets) && 0 == remoteProvider.requringRanges.count) {
-            
-            [remoteProvider _closeAudioFile];
-            if([remoteProvider _openAudioFileWithFileTypeHint:remoteProvider.audioFileTypeID]){
-                _audioFileID = remoteProvider.audioFileID;
-                UInt32 ioNumBytes = afio.srcBufferSize;
-                UInt32 ioNumberDataPackets = 1;
-                [remoteProvider setRequireRanges:nil];
-                status = AudioFileReadPacketData(_audioFileID, FALSE, &ioNumBytes, afio.pktDescs, afio.pos, &ioNumberDataPackets, afio.srcBuffer);
-            }
-            else{
-                NSAssert(NO, @"can't open audio file");
-            }
-            
-        }
-        
-        if (remoteProvider.requringRanges.count) {
-            [provider unlockForRead];
-            [remoteProvider requesetNeededRange];
-            _needRefreshAudioFile = YES;
             pthread_mutex_unlock(&_decodingContext.mutex);
             return DOUAudioDecoderWaiting;
         }
-    
     }
-    
+    _playbackItem.requringRanges = nil;
     AudioBufferList fillBufList;
     fillBufList.mNumberBuffers = 1;
     fillBufList.mBuffers[0].mNumberChannels = _decodingContext.inputFormat.mChannelsPerFrame;
@@ -446,47 +445,117 @@ static OSStatus decoder_data_proc(AudioConverterRef inAudioConverter, UInt32 *io
             pthread_mutex_unlock(&_decodingContext.mutex);
             return DOUAudioDecoderFailed;
         }
-        else if(status != noErr){
-            _needRefreshAudioFile = YES;
-            if(ioOutputDataPackets == 0 || status != -50){
+        else {
+            
+            _DOUAudioRemoteFileProvider *remoteProvider = (_DOUAudioRemoteFileProvider *)provider;
+            if (_playbackItem.requringRanges.count) {
+                [provider unlockForRead];
+                [remoteProvider setRequireRanges:_playbackItem.requringRanges];
+                [remoteProvider requesetNeededRange];
+                pthread_mutex_unlock(&_decodingContext.mutex);
+                return DOUAudioDecoderWaiting;
+            }
+            else{
                 [provider unlockForRead];
                 pthread_mutex_unlock(&_decodingContext.mutex);
-                return DOUAudioDecoderRefreshing;
-                
+                return DOUAudioDecoderFailed;
             }
         }
     }
     
     if (ioOutputDataPackets == 0) {
-        if (!_setupBeforeFinished || _decodingContext.afio.pos == _playbackItem.audioDataPacketCount) {
+        if (!_setupBeforeFinished ) {
             [_lpcm setEnd:YES];
             [provider unlockForRead];
             pthread_mutex_unlock(&_decodingContext.mutex);
             return DOUAudioDecoderEndEncountered;
         }
-        else{
-            _needRefreshAudioFile = YES;
-            [provider unlockForRead];
-            pthread_mutex_unlock(&_decodingContext.mutex);
-            return DOUAudioDecoderRefreshing;
+        else {
+            _DOUAudioRemoteFileProvider *remoteProvider = (_DOUAudioRemoteFileProvider *)provider;
+            DOUAudioDecoderStatus status = [self handleNoMorePacketsWhenUnFinshed:remoteProvider];
+            switch (status) {
+                case DOUAudioDecoderSucceeded:
+                case DOUAudioDecoderRefreshing:
+                case DOUAudioDecoderFailed:
+                    [provider unlockForRead];
+                    pthread_mutex_unlock(&_decodingContext.mutex);
+                    return status;
+                    break;
+                case DOUAudioDecoderWaiting:
+                    NSAssert(_playbackItem.requringRanges.count, @"not handle correctly");
+                {
+                    [provider unlockForRead];
+                    
+                    if (_playbackItem.requringRanges.count > 0){
+                        
+                        [remoteProvider setRequireRanges:_playbackItem.requringRanges];
+                        [remoteProvider requesetNeededRange];
+                    }
+                    pthread_mutex_unlock(&_decodingContext.mutex);
+                    return status;
+                }
+                    break;
+                case DOUAudioDecoderEndEncountered:
+                    [_lpcm setEnd:YES];
+                    [provider unlockForRead];
+                    pthread_mutex_unlock(&_decodingContext.mutex);
+                    return status;
+            }
+            
         }
-    }
-    
-    SInt64 frame1 = _decodingContext.outputPos + ioOutputDataPackets;
-    if (_decodingContext.decodeValidFrames != 0 &&
-        frame1 > _decodingContext.decodeValidFrames) {
-        SInt64 framesToTrim64 = frame1 - _decodingContext.decodeValidFrames;
-        UInt32 framesToTrim = (framesToTrim64 > ioOutputDataPackets) ? ioOutputDataPackets : (UInt32)framesToTrim64;
-        int bytesToTrim = (int)(framesToTrim * _decodingContext.outputFormat.mBytesPerFrame);
         
-        fillBufList.mBuffers[0].mDataByteSize -= (unsigned long)bytesToTrim;
-        ioOutputDataPackets -= framesToTrim;
-        
-        if (ioOutputDataPackets == 0) {
-            [_lpcm setEnd:YES];
-            [provider unlockForRead];
-            pthread_mutex_unlock(&_decodingContext.mutex);
-            return DOUAudioDecoderEndEncountered;
+        SInt64 frame1 = _decodingContext.outputPos + ioOutputDataPackets;
+        if (_decodingContext.decodeValidFrames != 0 &&
+            frame1 > _decodingContext.decodeValidFrames) {
+            SInt64 framesToTrim64 = frame1 - _decodingContext.decodeValidFrames;
+            UInt32 framesToTrim = (framesToTrim64 > ioOutputDataPackets) ? ioOutputDataPackets : (UInt32)framesToTrim64;
+            int bytesToTrim = (int)(framesToTrim * _decodingContext.outputFormat.mBytesPerFrame);
+            
+            fillBufList.mBuffers[0].mDataByteSize -= (unsigned long)bytesToTrim;
+            ioOutputDataPackets -= framesToTrim;
+            
+            if (ioOutputDataPackets == 0) {
+                if (!_setupBeforeFinished ) {
+                    [_lpcm setEnd:YES];
+                    [provider unlockForRead];
+                    pthread_mutex_unlock(&_decodingContext.mutex);
+                    return DOUAudioDecoderEndEncountered;
+                }
+                else{
+                    
+                    _DOUAudioRemoteFileProvider *remoteProvider = (_DOUAudioRemoteFileProvider *)provider;
+                    DOUAudioDecoderStatus status = [self handleNoMorePacketsWhenUnFinshed:remoteProvider];
+                    switch (status) {
+                        case DOUAudioDecoderSucceeded:
+                        case DOUAudioDecoderRefreshing:
+                        case DOUAudioDecoderFailed:
+                            [provider unlockForRead];
+                            pthread_mutex_unlock(&_decodingContext.mutex);
+                            return status;
+                            break;
+                        case DOUAudioDecoderWaiting:
+                            NSAssert(_playbackItem.requringRanges.count, @"not handle correctly");
+                        {
+                            [provider unlockForRead];
+                            
+                            if (_playbackItem.requringRanges.count > 0){
+                                
+                                [remoteProvider setRequireRanges:_playbackItem.requringRanges];
+                                [remoteProvider requesetNeededRange];
+                            }
+                            pthread_mutex_unlock(&_decodingContext.mutex);
+                            return status;
+                        }
+                            break;
+                        case DOUAudioDecoderEndEncountered:
+                            [_lpcm setEnd:YES];
+                            [provider unlockForRead];
+                            pthread_mutex_unlock(&_decodingContext.mutex);
+                            return status;
+                    }
+                    
+                }
+            }
         }
     }
     

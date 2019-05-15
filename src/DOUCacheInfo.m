@@ -80,12 +80,10 @@
             NSArray *cachedRange = _cachedSegment[i];
             NSUInteger rangeStart = [cachedRange[0] unsignedIntegerValue];
             NSUInteger rangeEnd = [cachedRange[1] unsignedIntegerValue];
-            NSUInteger maxEnd = MAX(rangeEnd, NSMaxRange(range));
-            NSUInteger minStart = MIN(rangeStart, range.location);
-            NSRange range1 = range;
             NSRange range2 = NSMakeRange(rangeStart, rangeEnd - rangeStart);
-            if (NSIntersectionRange(range1, range2).length > 0) { // range intersect
-                _cachedSegment[i] = @[@(minStart), @(maxEnd)];
+            NSRange unionRange = NSUnionRange(range, range2);
+            if (NSIntersectionRange(range, range2).length > 0 || unionRange.length == range.length + range2.length ) { // range intersect
+                _cachedSegment[i] = @[@(unionRange.location), @(NSMaxRange(unionRange))];
                 found = YES;
                 break;
             }
@@ -123,7 +121,7 @@
 - (NSRange)nextNeedCacheRangeWithStartOffset:(NSUInteger)startOffset
 {
     if (startOffset > self.expectedLength) {
-        return NSMakeRange((NSUInteger)self.expectedLength, 0);
+        return NSMakeRange((NSUInteger)self.expectedLength-1, 0);
     }
     NSRange needRange = NSMakeRange(0, (NSUInteger)(self.expectedLength-1));
     BOOL found = NO;
@@ -171,17 +169,18 @@
         NSArray *a2 = obj2;
         return [a1[0] compare:a2[0]];
     }];
-    NSArray *preRange = nil;
-    NSArray *curRange = nil;
+    NSArray<NSNumber*> *preRangeArray = nil;
+    NSArray<NSNumber*> *curRangeArray = nil;
     for (NSUInteger i=1; i<mutableRangs.count; ) {
-        preRange = mutableRangs[i-1];
-        curRange = mutableRangs[i];
-        if ([curRange[0] unsignedIntegerValue] >= [preRange[0] unsignedIntegerValue] &&
-            [curRange[1] unsignedIntegerValue] >= [preRange[1] unsignedIntegerValue] &&
-            [curRange[0] unsignedIntegerValue] <= [preRange[1] unsignedIntegerValue]) {
-            [mutableRangs removeObject:preRange];
-            [mutableRangs removeObject:curRange];
-            [mutableRangs insertObject:@[preRange[0], curRange[1]] atIndex:i-1];
+        preRangeArray = mutableRangs[i-1];
+        curRangeArray = mutableRangs[i];
+        NSRange preRange = NSMakeRange(preRangeArray.firstObject.unsignedIntegerValue, preRangeArray.lastObject.unsignedIntegerValue - preRangeArray.firstObject.unsignedIntegerValue);
+        NSRange curRange = NSMakeRange(curRangeArray.firstObject.unsignedIntegerValue, curRangeArray.lastObject.unsignedIntegerValue - curRangeArray.firstObject.unsignedIntegerValue);
+        NSRange unionRange = NSUnionRange(preRange, curRange);
+        if (NSIntersectionRange(preRange, curRange).length > 0  || unionRange.length == curRange.length + preRange.length) {
+            [mutableRangs removeObject:preRangeArray];
+            [mutableRangs removeObject:curRangeArray];
+            [mutableRangs insertObject:@[@(unionRange.location), @(NSMaxRange(unionRange))] atIndex:i-1];
             continue;
         }
         i++;

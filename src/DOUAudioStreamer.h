@@ -28,6 +28,7 @@ typedef NS_ENUM(NSUInteger, DOUAudioStreamerStatus) {
     DOUAudioStreamerPaused,
     DOUAudioStreamerFinished,
     DOUAudioStreamerBuffering,
+    DOUAudioStreamerReBuffering,
     DOUAudioStreamerError
 };
 

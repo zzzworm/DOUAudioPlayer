@@ -152,11 +152,8 @@
     else {
         pthread_mutex_lock(&_dataMutex);
         [_mappedData dou_synchronizeMappedFile];
-        pthread_mutex_unlock(&_dataMutex);
-        if (![self checkRequireRangeFullfilledAndRemoveFullfilled:YES]) {
-            [self requesetNeededRange];
-        }
         [self.cacheInfo writeToFile:[self.class _metaPathForAudioFileURL:self.audioFile.audioFileURL]];
+        pthread_mutex_unlock(&_dataMutex);
     }
     [self handleRequestComplete];
 }
@@ -182,8 +179,12 @@
         self.hintProvider == nil) {
         self.hintProvider = [[[self class] alloc] _initWithAudioFile:self.hintFile config:self.config];
     }
-    
-    [self _invokeEventBlock];
+    if (![self checkRequireRangeFullfilledAndRemoveFullfilled:YES]) {
+        [self requesetNeededRange];
+    }
+    else{
+        [self _invokeEventBlock];
+    }
     
 }
 
@@ -235,10 +236,14 @@
     if (!_readyToProducePackets && !_failed) {
         [self tryOpenAudioFile];
     }
-    if (_readyToProducePackets && [self requireRangeFullfilled]) {
-        _requringRanges = nil;
-        if ([self shouldInvokeDecoder]) {
-            [self _invokeEventBlock];
+    if (_readyToProducePackets) {
+        if ([self checkRequireRangeFullfilledAndRemoveFullfilled:YES]) {
+            if ([self shouldInvokeDecoder]) {
+                [self _invokeEventBlock];
+            }
+        }
+        else{
+            [self requesetNeededRange];
         }
     }
 }
@@ -481,8 +486,11 @@ static OSStatus audio_file_probe(void *inClientData,
         //[fileProvider seekToOffset:inPosition + *actualCount];
         NSArray<NSNumber *>* requireRange = @[@(inPosition), @(requestCount)];
         [fileProvider.requringRanges addObject:requireRange];
+        return kAudioFileInvalidChunkError;
     }
-    return noErr;
+    else{
+        return noErr;
+    }
 }
 
 static SInt64 audio_file_get_size(void *inClientData)

@@ -306,7 +306,7 @@ typedef NS_ENUM(uint64_t, event_type) {
     else if (event == event_provider_events) {
         if (*streamer != nil &&
             [*streamer status] == DOUAudioStreamerBuffering) {
-            [*streamer setStatus:DOUAudioStreamerPlaying];
+            [*streamer setStatus:DOUAudioStreamerReBuffering];
         }
 //        [*streamer setDuration:[[*streamer playbackItem] estimatedDuration]/1000.0];
         [*streamer setBufferingRatio:[[*streamer fileProvider] bufferingRatio]];
@@ -376,7 +376,7 @@ typedef NS_ENUM(uint64_t, event_type) {
         return;
     }
     
-    if ([streamer status] != DOUAudioStreamerPlaying) {
+    if (!([streamer status] == DOUAudioStreamerPlaying || DOUAudioStreamerReBuffering == [streamer status])) {
         return;
     }
     
@@ -420,6 +420,7 @@ typedef NS_ENUM(uint64_t, event_type) {
     
     switch ([[streamer decoder] decodeOnce]) {
         case DOUAudioDecoderSucceeded:
+            [streamer setStatus:DOUAudioStreamerPlaying];
             break;
             
         case DOUAudioDecoderFailed:
@@ -440,6 +441,10 @@ typedef NS_ENUM(uint64_t, event_type) {
             
         case DOUAudioDecoderRefreshing:
             
+            if(((NSUInteger)[[self currentStreamer] timingOffset] + [_renderer currentTime]) >= [streamer playbackItem].estimatedDuration){
+                [_renderer stop];
+                [streamer setStatus:DOUAudioStreamerFinished];
+            }
             return;
     }
     

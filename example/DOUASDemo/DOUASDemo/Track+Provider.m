@@ -63,13 +63,13 @@
 //        [allTracks addObject:track];
 //    }
     //
-    {
-        Track *track = [[Track alloc] init];
-    [track setArtist:@"china audio"];
-    [track setTitle:@"ximalaya audio 1"];
-    [track setAudioFileURL:[NSURL URLWithString:@"http://192.168.121.91:8000/sn_7_ep_12.m4a"]];
-    [allTracks addObject:track];
-    }
+//    {
+//        Track *track = [[Track alloc] init];
+//    [track setArtist:@"china audio"];
+//    [track setTitle:@"ximalaya audio 1"];
+//    [track setAudioFileURL:[NSURL URLWithString:@"http://192.168.121.91:8000/sn_7_ep_12.m4a"]];
+//    [allTracks addObject:track];
+//    }
     
     {
         Track *track = [[Track alloc] init];

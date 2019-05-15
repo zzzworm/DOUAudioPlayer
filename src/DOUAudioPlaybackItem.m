@@ -29,6 +29,9 @@
     NSUInteger _estimatedDuration;
     NSUInteger _audioDataByteCount;
     NSUInteger _audioDataPacketCount;
+    BOOL _cacheMissed;
+    
+    NSMutableArray<NSArray<NSNumber *>*> *_requringRanges;
 }
 @end
 
@@ -43,6 +46,8 @@
 @synthesize estimatedDuration = _estimatedDuration;
 @synthesize audioDataByteCount = _audioDataByteCount;
 @synthesize audioDataPacketCount = _audioDataPacketCount;
+
+@dynamic requringRanges;
 
 - (id <DOUAudioFile>)audioFile
 {
@@ -83,8 +88,15 @@ static OSStatus audio_file_read(void *inClientData,
         NSData *output = [[item filePreprocessor] handleData:input offset:(NSUInteger)inPosition];
         memcpy(buffer, [output bytes], [output length]);
     }
-    
-    return noErr;
+    if (*actualCount < requestCount){
+        //[fileProvider seekToOffset:inPosition + *actualCount];
+        NSArray<NSNumber *>* requireRange = @[@(inPosition), @(requestCount)];
+        [item.requringRanges addObject:requireRange];
+        return kAudioFileInvalidChunkError;
+    }
+    else{
+        return noErr;
+    }
 }
 
 static SInt64 audio_file_get_size(void *inClientData)
@@ -359,4 +371,17 @@ static SInt64 audio_file_get_size(void *inClientData)
     }
 }
 
+
+- (NSMutableArray<NSArray<NSNumber *>*> *)requringRanges
+{
+    if (nil == _requringRanges) {
+        _requringRanges = [NSMutableArray array];
+    }
+    return _requringRanges;
+}
+
+- (void)setRequringRanges:(NSMutableArray<NSArray<NSNumber *>*> *)ranges
+{
+    _requringRanges = ranges;
+}
 @end

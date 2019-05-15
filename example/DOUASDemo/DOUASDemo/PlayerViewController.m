@@ -266,7 +266,7 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
     [_statusLabel setText:@"finished"];
     //[self _actionNext:nil];
     break;
-
+  case DOUAudioStreamerReBuffering:
   case DOUAudioStreamerBuffering:
     [_statusLabel setText:@"buffering"];
     break;

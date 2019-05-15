@@ -275,7 +275,7 @@ static void ReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkReach
     if (0 == range.length) {
         return;
     }
-    if (_request && !_request.isFinished && range.location == _request.position + _request.receivedLength) {
+    if (_request && !_request.isFinished && range.location >= _request.position && range.location < _request.length + _request.position) { //avoid already request
         return;
     }
     _requireOffset = offset;
