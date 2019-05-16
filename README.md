@@ -6,6 +6,9 @@
 
 DOUAudioStreamer is a Core Audio based streaming audio player for iOS/Mac.
 
+DOUAudioPlayer Can play any audio file from streaming(even not optimize for networking), but if audio file is VBR, and call seek, may have bad performance.
+
+
 ## How to Use
 
 [Download](https://github.com/douban/DOUAudioStreamer/archive/master.zip) DOUAudioStreamer, drag everything inside src into your Xcode project and you are ready to go.
