@@ -159,6 +159,11 @@
 }
 
 - (void)handleRequestComplete{
+    if (!_readyToProducePackets && !_failed) {
+        if (![self tryOpenAudioFile]) {
+            return;
+        }
+    }
     if (!_failed && self.isFinished && !_audioFileID) {
         _failed = YES;
     }
@@ -233,9 +238,6 @@
         CC_SHA256_Update(_sha256Ctx, [data bytes], (CC_LONG)[data length]);
     }
     
-    if (!_readyToProducePackets && !_failed) {
-        [self tryOpenAudioFile];
-    }
     if (_readyToProducePackets) {
         if ([self checkRequireRangeFullfilledAndRemoveFullfilled:YES]) {
             if ([self shouldInvokeDecoder]) {
@@ -290,23 +292,21 @@
     return [self checkRequireRangeFullfilledAndRemoveFullfilled:NO];
 }
 
-- (void)tryOpenAudioFile
+- (BOOL)tryOpenAudioFile
 {
     BOOL requringRangeFullfilled = [self checkRequireRangeFullfilledAndRemoveFullfilled:YES];
     if (requringRangeFullfilled ) {
         _requringRanges = nil;
-        
         if ([self open]) {
             _readyToProducePackets = YES;
             _requringRanges = nil;
-        }
-        else{
-            [self requesetNeededRange];
+            return YES;
         }
     }
-    else{
-        [self requesetNeededRange];
-    }
+    
+    [self requesetNeededRange];
+    
+    return NO;
 }
 
 - (BOOL)isOpened
@@ -523,7 +523,12 @@ static SInt64 audio_file_get_size(void *inClientData)
         return;
     }
     [self cancelRequest];
-    [self _createRequest:(SInt64)range.location length:0];
+    if (_readyToProducePackets) {
+        [self _createRequest:(SInt64)range.location length:0];
+    }
+    else{
+        [self _createRequest:(SInt64)range.location length:DOU_DEFAULT_BUFFER_SIZE_REQUIRED_TO_START_PLAYING_AFTER_BUFFER_UNDERRUN];
+    }
     [_request start];
 }
 

@@ -63,13 +63,13 @@
 //        [allTracks addObject:track];
 //    }
     //
-//    {
-//        Track *track = [[Track alloc] init];
-//    [track setArtist:@"china audio"];
-//    [track setTitle:@"ximalaya audio 1"];
-//    [track setAudioFileURL:[NSURL URLWithString:@"http://192.168.121.91:8000/sn_7_ep_12.m4a"]];
-//    [allTracks addObject:track];
-//    }
+    {
+        Track *track = [[Track alloc] init];
+        [track setArtist:@"china audio"];
+        [track setTitle:@"ximalaya audio 1"];
+        [track setAudioFileURL:[NSURL URLWithString:@"https://ondemand.npr.org/anon.npr-mp3/npr/pmoney/2021/06/20210623_pmoney_pmpod1092.mp3?d=1671&size=26740280&e=1009435128&t=podcast&pod=510289"]];
+        [allTracks addObject:track];
+    }
     
     {
         Track *track = [[Track alloc] init];

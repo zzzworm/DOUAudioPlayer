@@ -11,6 +11,10 @@
 #include <CommonCrypto/CommonDigest.h>
 #include <AudioToolbox/AudioToolbox.h>
 
+#define DOUHTTPRequestMaxLength (15 * 1024 *1024)
+
+#define DOU_DEFAULT_BUFFER_SIZE_REQUIRED_TO_START_PLAYING_AFTER_BUFFER_UNDERRUN (128*1024)
+
 NS_ASSUME_NONNULL_BEGIN
 
 @interface _DOUAudioRemoteFileProvider : DOUAudioFileProvider 
